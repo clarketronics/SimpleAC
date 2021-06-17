@@ -3,8 +3,7 @@
 
       Fault's:
         2 * short beeps and/or red flashes | MP3 module failed
-        3 * short beeps and/or red flashes | PN532 module failed
-        4 * short beeps and/or red flashes | RC522 module failed
+        3 * short beeps and/or red flashes | Reader module failed
 
   * If LED's and Buzzer are enabled the authorised and unautorised blinks / buzzes 
     will be which ever value is greater.
@@ -42,7 +41,6 @@ byte smallCard[4] = {00,00,00,00};
 #if defined(usingRC522) && defined(usingPN532) 
 #error "You can't define both readers at the same time!."
 #endif
-
 
 //-------Hardcoded UID's-------
 #ifdef hardcodeUID
@@ -573,12 +571,12 @@ bool checkcard(byte readCard[]){
     }
 
     // Read Master Card's UID from EEPROM
-    for ( int i = 0; i < 7; i++ ) {          
-      masterCard[i] = EEPROM.read(4 + i);
+    for ( int i = 0; i < masterSize; i++ ) {          
+      masterCard[i] = EEPROM.read(masterSizeLoc + 1 + i);
     }
 
     #ifdef debug
-      PrintHex8(masterCard, 7); // Print each character of the mastercard UID.
+      PrintHex8(masterCard, masterSize); // Print each character of the mastercard UID.
       Serial.println("");
     #endif
 
@@ -592,7 +590,9 @@ bool checkcard(byte readCard[]){
       #endif
 
       // Flash led / beep a set number of times.
-      flashBeep(5, interval, RGBgreenState, RGBgreen);
+      flashBeep(1, interval, RGBredState, RGBred);      
+      flashBeep(1, interval, RGBgreenState, RGBgreen);
+      flashBeep(1, interval, RGBredState, RGBred);
 
       bool buttonState = monitorClearButton(10000); // Wait for the button to be pressed for 10 seconds.
 
@@ -793,18 +793,10 @@ void setup() {
         digitalWrite(Buzzer, HIGH); // Activates the buzzer.
         delay(200); // Delay 0.2 seconds.
         digitalWrite(Buzzer, LOW); // Deactivates the buzzer.
-        delay(200); // Delay 0.2 seconds.
-        digitalWrite(Buzzer, HIGH); // Activates the buzzer.
-        delay(200); // Delay 0.2 seconds.
-        digitalWrite(Buzzer, LOW); // Deactivates the buzzer.
       #endif
       
       // Error state outputs (Red led flash).
       #ifdef usingLED
-        digitalWrite(RGBred, HIGH); // Activates the red LED.
-        delay(200); // Delay 0.2 seconds.
-        digitalWrite(RGBred, LOW); // Deactivates the red LED.
-        delay(200); // Delay 0.2 seconds.
         digitalWrite(RGBred, HIGH); // Activates the red LED.
         delay(200); // Delay 0.2 seconds.
         digitalWrite(RGBred, LOW); // Deactivates the red LED.
