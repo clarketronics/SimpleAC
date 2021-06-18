@@ -557,16 +557,7 @@ bool checkcard(byte readCard[]){
     #endif
 
     // Wait until we scan a card befor continuing.
-    cardRead = false;
-    while (!cardRead) {
-      #ifdef usingRC522
-        cardRead = rc522Read();
-      #endif
-
-      #ifdef usingPN532
-        cardRead = pn532Read();        
-      #endif
-    }
+    waitForCard();
 
     // Read Master Card's UID from EEPROM
     for ( int i = 0; i < masterSize; i++ ) {          
@@ -626,6 +617,19 @@ bool checkcard(byte readCard[]){
   } 
 #endif
 
+void waitForCard(){ //blocks until a card is present at the reader.
+    cardRead = false;
+    while (!cardRead) {
+      #ifdef usingRC522
+        cardRead = rc522Read();
+      #endif
+
+      #ifdef usingPN532
+        cardRead = pn532Read();        
+      #endif
+    }
+}
+
 //clear card read arrays and reset readstate booleans:
 void cleanup(){
     cardRead = false;
@@ -640,6 +644,7 @@ void cleanup(){
       smallCard[i] = 00;
     }
 }
+
 
 void setup() {
   #ifdef usingLED
@@ -975,16 +980,7 @@ void loop() {
         flashBeep(1, interval, RGBgreenState, RGBgreen);
 
         // Wait until we scan a card befor continuing.
-        cardRead = false;
-        while (!cardRead) {
-          #ifdef usingRC522
-            cardRead = rc522Read();
-          #endif
-
-          #ifdef usingPN532
-            cardRead = pn532Read();        
-          #endif
-        }
+        waitForCard();
 
         // Check to see if 4 or 7 byte uid.
         itsA4byte = check4Byte();
@@ -1134,7 +1130,7 @@ void loop() {
     bool matchFound = false;
 
     // Check whether the card read is known.
-    if (cardRead == true) {
+    if (cardRead) {
       matchFound = checkcard(readCard);
     }
   #endif
@@ -1184,16 +1180,7 @@ void loop() {
 
       while (learningMode){
         // Wait for a card to be scanned.
-        cardRead = false;
-        while (!cardRead){
-          #ifdef usingRC522
-              cardRead = rc522Read();
-            #endif
-
-            #ifdef usingPN532
-              cardRead = pn532Read();        
-            #endif
-        }
+        waitForCard();
         
         // Check to see if card is a 4 byte UID.
         //if (cardRead) { //redundant, since code won't reach here unless cardRead is true.
