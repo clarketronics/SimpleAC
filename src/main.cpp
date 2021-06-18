@@ -134,11 +134,9 @@ byte smallCard[4] = {00,00,00,00};
 
 //-------Programmable uid config-------            
 #ifndef hardcodeUID
-  // These are user defiend variables.
-  int clearButton = 2; // The pin to monitor on start up to enter clear mode. Can be 2 or 3 (LT and TO on the simpleAC).
-
   // These are needed to function, no touching.
   #include <linkedlist.h>
+  #define clearButton A0 // The pin to monitor on start up to enter clear mode.
   int cardCount, masterSize;
   bool scorchedEarth, eepromRead;
   bool itsA4byte = false;
