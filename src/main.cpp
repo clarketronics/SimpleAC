@@ -22,7 +22,7 @@
 //-------Global variables and includes-------
 #include <Arduino.h>
 #include <EEPROM.h>
-#define unauthScanLoc 2
+#define unauthScanCountLocation 2
 bool matchfound, enabled, cardRead;
 unsigned int authorisedOutputs, unauthorisedOutputs, authorisedStates, unauthorisedStates, interval;
 long lockout[] = {60000, 120000, 300000, 900000};
@@ -134,17 +134,19 @@ byte smallCard[4] = {00,00,00,00};
 
 //-------Programmable uid config-------            
 #ifndef hardcodeUID
+  // These are user defiend variables.
+  int clearButton = 2; // The pin to monitor on start up to enter clear mode. Can be 2 or 3 (LT and TO on the simpleAC).
+
   // These are needed to function, no touching.
   #include <linkedlist.h>
-  int clearButton = 2;
   int cardCount, masterSize;
   bool scorchedEarth, eepromRead;
   bool itsA4byte = false;
   byte masterCard[7] = {00,00,00,00,00,00,00};
 
-  #define masterDefLoc 0
-  #define cardCountLoc 1
-  #define masterSizeLoc 3
+  #define masterDefinedLocation 0
+  #define cardCountLocation 1
+  #define masterUIDSizeLocation 3
 
 
   class card {
@@ -308,7 +310,7 @@ void PrintHex8(uint8_t *data, uint8_t length) {
 // If UID is correct do this.
 void authorised() { 
   // Reset the un authorised scan counter.
-  EEPROM.update(unauthScanLoc, 0);
+  EEPROM.update(unauthScanCountLocation, 0);
 
   // Serial message to notify that UID is valid.
   #ifdef debug
@@ -364,9 +366,9 @@ void authorised() {
 // If UID is incorrect do this.
 void unauthorised() { 
   // Write the number of aunothorised scans to eeprom.
-  int unAuthScan = EEPROM.read(unauthScanLoc);
+  int unAuthScan = EEPROM.read(unauthScanCountLocation);
   unAuthScan++;
-  EEPROM.update(unauthScanLoc, unAuthScan);
+  EEPROM.update(unauthScanCountLocation, unAuthScan);
 
   // Serial message to notify that UID is invalid.
   #ifdef debug
@@ -405,7 +407,7 @@ void unauthorised() {
 // If scan has been authorised previously were going to cut power.
 void shutdown() {
    // Reset the un authorised scan counter.
-  EEPROM.update(unauthScanLoc, 0);
+  EEPROM.update(unauthScanCountLocation, 0);
 
   // Serial message to notify that UID is valid.
   #ifdef debug
@@ -568,7 +570,7 @@ void waitForCard(){
 
     // Read Master Card's UID from EEPROM
     for ( int i = 0; i < masterSize; i++ ) {          
-      masterCard[i] = EEPROM.read(masterSizeLoc + 1 + i);
+      masterCard[i] = EEPROM.read(masterUIDSizeLocation + 1 + i);
     }
 
     #ifdef debug
@@ -961,7 +963,7 @@ void loop() {
       }
 
       // Check if master is defined, halt if not.
-      if (EEPROM.read(masterDefLoc) != 143) {
+      if (EEPROM.read(masterDefinedLocation) != 143) {
         #ifdef debug
           Serial.println(F("-------------------"));
           Serial.println(F("No master card defined."));
@@ -981,16 +983,16 @@ void loop() {
 
         // Write the scanned card to the eeprom as the master card.
         if (!itsA4byte) {
-          EEPROM.update(masterSizeLoc, 7);
+          EEPROM.update(masterUIDSizeLocation, 7);
           masterSize = 7;
           for (unsigned int i = 0; i < 7; i++ ) {        
-            EEPROM.update(masterSizeLoc + 1 + i, readCard[i]);  // Write scanned PICC's UID to EEPROM, start from address 3
+            EEPROM.update(masterUIDSizeLocation + 1 + i, readCard[i]);  // Write scanned PICC's UID to EEPROM, start from address 3
           }
         } else {
           masterSize = 4;
-          EEPROM.update(masterSizeLoc, 4);
+          EEPROM.update(masterUIDSizeLocation, 4);
           for (unsigned int i = 0; i < 4; i++ ) {        
-            EEPROM.update(masterSizeLoc + 1 + i, smallCard[i]);  // Write scanned PICC's UID to EEPROM, start from address 3
+            EEPROM.update(masterUIDSizeLocation + 1 + i, smallCard[i]);  // Write scanned PICC's UID to EEPROM, start from address 3
           }
         }
 
@@ -1006,25 +1008,25 @@ void loop() {
         #endif
 
         // Write to EEPROM we defined Master Card.
-        EEPROM.update(masterDefLoc, 143);
+        EEPROM.update(masterDefinedLocation, 143);
 
       }
 
       // Read the number of cards currently stored, not including master.
-      cardCount = EEPROM.read(cardCountLoc);
+      cardCount = EEPROM.read(cardCountLocation);
 
       // Read the master card and place in memory.
-      masterSize = EEPROM.read(masterSizeLoc);
+      masterSize = EEPROM.read(masterUIDSizeLocation);
 
       for (int i = 0; i < masterSize; i++) {
-        byte recievedByte = readUIDbit(masterSizeLoc + 1, i);
+        byte recievedByte = readUIDbit(masterUIDSizeLocation + 1, i);
         memcpy(masterCard + i, &recievedByte, 1);
       }
 
       // Read access cards and place in memory.
       if (cardCount != 0) {
         // Itterate through the number of cards.
-        int startPos = masterSizeLoc + masterSize + 1;
+        int startPos = masterUIDSizeLocation + masterSize + 1;
         
         for (int i = 0; i < cardCount; i++) {
           // Read cards size.
@@ -1246,7 +1248,7 @@ void loop() {
           #endif
 
           // Create a start position.
-          int startPos = masterSizeLoc + masterSize + 1;
+          int startPos = masterUIDSizeLocation + masterSize + 1;
 
           // Find the next place to write the card.
           for (int i = 0; i < authorisedCards.size(); i++) {
@@ -1303,7 +1305,7 @@ void loop() {
 
           // Update the number of known cards.
           cardCount++;
-          EEPROM.update(cardCountLoc, cardCount);
+          EEPROM.update(cardCountLocation, cardCount);
 
           // Flash led / beep a set number of times.
           flashBeep(3, interval, RGBblueState, RGBblue);
@@ -1345,7 +1347,7 @@ void loop() {
           authorisedCards.remove(currentCard.index);
 
           // Go through the eeprom and remove the blank space.
-          int startPos = masterSizeLoc + masterSize + 1;
+          int startPos = masterUIDSizeLocation + masterSize + 1;
           for (int i = 0; i < authorisedCards.size(); i++) {
             card myCard = authorisedCards.get(i);
             EEPROM.update(startPos, myCard.size);
@@ -1361,7 +1363,7 @@ void loop() {
 
           // Update the number of known cards.
           cardCount--;
-          EEPROM.update(cardCountLoc, cardCount);
+          EEPROM.update(cardCountLocation, cardCount);
 
           // Flash led / beep a set number of times.
           flashBeep(3, interval, RGBblueState, RGBblue);
