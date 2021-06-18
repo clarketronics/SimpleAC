@@ -976,7 +976,7 @@ void loop() {
 
         // Wait until we scan a card befor continuing.
         cardRead = false;
-        while (cardRead == false) {
+        while (!cardRead) {
           #ifdef usingRC522
             cardRead = rc522Read();
           #endif
@@ -1197,19 +1197,19 @@ void loop() {
         
         // Check to see if card is a 4 byte UID.
         //if (cardRead) { //redundant, since code won't reach here unless cardRead is true.
-          itsA4byte = check4Byte();
+        itsA4byte = check4Byte();
         //}
 
         // Check if scanned card was master. 
         masterFound = false;
         bool cardDefined = false;
-        if (cardRead) {
+        //if (cardRead) {  //redundant, since code won't reach here unless cardRead is true.
           if (!itsA4byte) {
             masterFound = checkmaster(readCard);
           } else {
             masterFound = checkmaster(smallCard);
           }
-        }
+        //}
 
         // If the card was master the leave learning mode.
         if (masterFound){
