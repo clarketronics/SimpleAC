@@ -626,6 +626,21 @@ bool checkcard(byte readCard[]){
   } 
 #endif
 
+//clear card read arrays and reset readstate booleans:
+void cleanup(){
+    cardRead = false;
+    matchfound = false;
+
+    // Clear readCard array.
+    for (int i = 0; i < 7; i++) {
+      readCard[i] = 00;
+    }
+
+    for (int i = 0; i < 4; i++) {
+      smallCard[i] = 00;
+    }
+}
+
 void setup() {
   #ifdef usingLED
     pinMode(RGBred, OUTPUT);   // Declaring red LED as an output.
@@ -1373,16 +1388,7 @@ void loop() {
         }
 
         // Clear readCard arrays.
-        for (int i = 0; i < 7; i++) {
-          readCard[i] = 00;
-        }
-
-        for (int i = 0; i < 4; i++) {
-          smallCard[i] = 00;
-        }
-      
-        cardRead = false;
-        matchfound = false;
+        cleanup();
       }
     }
 
@@ -1391,49 +1397,19 @@ void loop() {
   // If a match is found and the device is not already in an enabled state activate.
   if (matchFound && cardRead && !enabled) {
     authorised();
-    cardRead = false;
-    matchFound = false;
-
-    // Clear readCard array.
-    for (int i = 0; i < 7; i++) {
-      readCard[i] = 00;
-    }
-
-    for (int i = 0; i < 4; i++) {
-      smallCard[i] = 00;
-    }
+    cleanup();
   }
 
   // If a match is found and the device is already in an enabled state shutdown.
   if (matchFound && cardRead && enabled ) {
     shutdown();
-    cardRead = false;
-    matchFound = false;
-
-    // Clear readCard array.
-    for (int i = 0; i < 7; i++) {
-      readCard[i] = 00;
-    }
-
-    for (int i = 0; i < 4; i++) {
-      smallCard[i] = 00;
-    }
+    cleanup();
   }
 
   // If a match is not found unauthorised.
   if (!matchFound && cardRead) {
     unauthorised();
-    cardRead = false;
-    matchfound = false;
-
-    // Clear readCard array.
-    for (int i = 0; i < 7; i++) {
-      readCard[i] = 00;
-    }
-
-    for (int i = 0; i < 4; i++) {
-      smallCard[i] = 00;
-    }
+    cleanup();
    }
 
 }
