@@ -31,7 +31,7 @@
 #include <Arduino.h>
 #include <EEPROM.h>
 #define unauthScanLoc 2
-bool matchfound, enabled;
+bool matchfound, enabled, cardRead;
 unsigned int authorisedOutputs, unauthorisedOutputs, authorisedStates, unauthorisedStates, interval;
 long lockout[] = {60000, 120000, 300000, 900000};
 byte readCard[7] = {00,00,00,00,00,00,00};
@@ -557,14 +557,14 @@ bool checkcard(byte readCard[]){
     #endif
 
     // Wait until we scan a card befor continuing.
-    bool cardRead = false;
+    cardRead = false;
     while (!cardRead) {
       #ifdef usingRC522
         cardRead = rc522Read();
       #endif
 
       #ifdef usingPN532
-        cardRead = pn532Read();;        
+        cardRead = pn532Read();        
       #endif
     }
 
@@ -975,14 +975,14 @@ void loop() {
         flashBeep(1, interval, RGBgreenState, RGBgreen);
 
         // Wait until we scan a card befor continuing.
-        bool cardRead = false;
+        cardRead = false;
         while (cardRead == false) {
           #ifdef usingRC522
             cardRead = rc522Read();
           #endif
 
           #ifdef usingPN532
-            cardRead = pn532Read();;        
+            cardRead = pn532Read();        
           #endif
         }
 
@@ -1116,11 +1116,11 @@ void loop() {
   #endif
   
   #ifdef usingRC522
-    bool cardRead = rc522Read();
+    cardRead = rc522Read();
   #endif
 
   #ifdef usingPN532
-    bool cardRead = pn532Read();;        
+    cardRead = pn532Read();        
   #endif
 
   #ifndef hardcodeUID
@@ -1191,14 +1191,14 @@ void loop() {
             #endif
 
             #ifdef usingPN532
-              cardRead = pn532Read();;        
+              cardRead = pn532Read();        
             #endif
         }
         
         // Check to see if card is a 4 byte UID.
-        if (cardRead) {
+        //if (cardRead) { //redundant, since code won't reach here unless cardRead is true.
           itsA4byte = check4Byte();
-        }
+        //}
 
         // Check if scanned card was master. 
         masterFound = false;
@@ -1393,6 +1393,7 @@ void loop() {
     }
 
   #endif
+
 
   // If a match is found and the device is not already in an enabled state activate.
   if (matchFound && cardRead && !enabled) {
