@@ -519,6 +519,19 @@ bool checkcard(byte readCard[]){
   }
 #endif
 
+void waitForCard(){ //blocks until a card is present at the reader.
+    cardRead = false;
+    while (!cardRead) {
+      #ifdef usingRC522
+        cardRead = rc522Read();
+      #endif
+
+      #ifdef usingPN532
+        cardRead = pn532Read();        
+      #endif
+    }
+}
+
 #ifndef hardcodeUID
   // Clear button held during boot
   bool monitorClearButton(uint32_t interval) {
@@ -616,19 +629,6 @@ bool checkcard(byte readCard[]){
     }    
   } 
 #endif
-
-void waitForCard(){ //blocks until a card is present at the reader.
-    cardRead = false;
-    while (!cardRead) {
-      #ifdef usingRC522
-        cardRead = rc522Read();
-      #endif
-
-      #ifdef usingPN532
-        cardRead = pn532Read();        
-      #endif
-    }
-}
 
 //clear card read arrays and reset readstate booleans:
 void cleanup(){
@@ -1337,6 +1337,9 @@ void loop() {
           #endif
 
           // Find where in the list the card to be removed is.
+
+          //TODO: findCardToRemove seems to be able to return nothing, what happens then?
+          //TODO: what happens if a user tries to remove a card that isn't in the list??
           card currentCard;
           if (!itsA4byte) {          
             currentCard = findCardtoRemove(readCard);
