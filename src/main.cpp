@@ -1,10 +1,4 @@
 /* NOTES: 
-  Flash / beep codes:
-
-      Fault's:
-        2 * short beeps and/or red flashes | MP3 module failed
-        3 * short beeps and/or red flashes | Reader module failed
-
   * If LED's and Buzzer are enabled the authorised and unautorised blinks / buzzes 
     will be which ever value is greater.
 
@@ -13,8 +7,6 @@
 
   * Pull LT pin (D2) LOW at startup without defining hardcodedUID and you will enter a clear mode
     (this is shown by serial messages, 3 blue LED flashes and beeps) to clear the eeprom.
-
-
 */
 
 //-------Definitions- Delete the "//" of the modules you are using----------
@@ -519,7 +511,8 @@ bool checkcard(byte readCard[]){
   }
 #endif
 
-void waitForCard(){ //blocks until a card is present at the reader.
+// Blocks until a card is present at the reader.
+void waitForCard(){ 
     cardRead = false;
     while (!cardRead) {
       #ifdef usingRC522
@@ -532,6 +525,7 @@ void waitForCard(){ //blocks until a card is present at the reader.
     }
 }
 
+// Clear meathods when using master cards.
 #ifndef hardcodeUID
   // Clear button held during boot
   bool monitorClearButton(uint32_t interval) {
@@ -645,7 +639,7 @@ void cleanup(){
     }
 }
 
-
+// Setup.
 void setup() {
   #ifdef usingLED
     pinMode(RGBred, OUTPUT);   // Declaring red LED as an output.
@@ -953,7 +947,7 @@ void setup() {
   #endif
 }
 
-// Main loop
+// Main loop.
 void loop() {
 
   #ifndef hardcodeUID
