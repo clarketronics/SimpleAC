@@ -31,7 +31,7 @@
 #include <Arduino.h>
 #include <EEPROM.h>
 #define unauthScanLoc 2
-bool matchfound, enabled;
+bool matchfound, enabled, cardRead;
 unsigned int authorisedOutputs, unauthorisedOutputs, authorisedStates, unauthorisedStates, interval;
 long lockout[] = {60000, 120000, 300000, 900000};
 byte readCard[7] = {00,00,00,00,00,00,00};
@@ -343,10 +343,8 @@ void authorised() {
 
       delay(relay1Delay); //delay x seconds ( for example to allow bike time to prime)
     }
-  #endif
-
+  
   // Relay two engaged and dissengaged after some time (for example the starter of a motorcycle)
-  #ifdef usingRelays
     if (enableRelay2 == true) {
       digitalWrite(relay2, HIGH);
       relay2State = HIGH;
@@ -521,6 +519,19 @@ bool checkcard(byte readCard[]){
   }
 #endif
 
+void waitForCard(){ //blocks until a card is present at the reader.
+    cardRead = false;
+    while (!cardRead) {
+      #ifdef usingRC522
+        cardRead = rc522Read();
+      #endif
+
+      #ifdef usingPN532
+        cardRead = pn532Read();        
+      #endif
+    }
+}
+
 #ifndef hardcodeUID
   // Clear button held during boot
   bool monitorClearButton(uint32_t interval) {
@@ -559,16 +570,7 @@ bool checkcard(byte readCard[]){
     #endif
 
     // Wait until we scan a card befor continuing.
-    bool cardRead = false;
-    while (!cardRead) {
-      #ifdef usingRC522
-        cardRead = rc522Read();
-      #endif
-
-      #ifdef usingPN532
-        cardRead = pn532Read();;        
-      #endif
-    }
+    waitForCard();
 
     // Read Master Card's UID from EEPROM
     for ( int i = 0; i < masterSize; i++ ) {          
@@ -627,6 +629,22 @@ bool checkcard(byte readCard[]){
     }    
   } 
 #endif
+
+//clear card read arrays and reset readstate booleans:
+void cleanup(){
+    cardRead = false;
+    matchfound = false;
+
+    // Clear readCard array.
+    for (int i = 0; i < 7; i++) {
+      readCard[i] = 00;
+    }
+
+    for (int i = 0; i < 4; i++) {
+      smallCard[i] = 00;
+    }
+}
+
 
 void setup() {
   #ifdef usingLED
@@ -962,16 +980,7 @@ void loop() {
         flashBeep(1, interval, RGBgreenState, RGBgreen);
 
         // Wait until we scan a card befor continuing.
-        bool cardRead = false;
-        while (cardRead == false) {
-          #ifdef usingRC522
-            cardRead = rc522Read();
-          #endif
-
-          #ifdef usingPN532
-            cardRead = pn532Read();;        
-          #endif
-        }
+        waitForCard();
 
         // Check to see if 4 or 7 byte uid.
         itsA4byte = check4Byte();
@@ -1103,11 +1112,11 @@ void loop() {
   #endif
   
   #ifdef usingRC522
-    bool cardRead = rc522Read();
+    cardRead = rc522Read();
   #endif
 
   #ifdef usingPN532
-    bool cardRead = pn532Read();;        
+    cardRead = pn532Read();        
   #endif
 
   #ifndef hardcodeUID
@@ -1121,7 +1130,7 @@ void loop() {
     bool matchFound = false;
 
     // Check whether the card read is known.
-    if (cardRead == true) {
+    if (cardRead) {
       matchFound = checkcard(readCard);
     }
   #endif
@@ -1171,32 +1180,23 @@ void loop() {
 
       while (learningMode){
         // Wait for a card to be scanned.
-        cardRead = false;
-        while (!cardRead){
-          #ifdef usingRC522
-              cardRead = rc522Read();
-            #endif
-
-            #ifdef usingPN532
-              cardRead = pn532Read();;        
-            #endif
-        }
+        waitForCard();
         
         // Check to see if card is a 4 byte UID.
-        if (cardRead) {
-          itsA4byte = check4Byte();
-        }
+        //if (cardRead) { //redundant, since code won't reach here unless cardRead is true.
+        itsA4byte = check4Byte();
+        //}
 
         // Check if scanned card was master. 
         masterFound = false;
         bool cardDefined = false;
-        if (cardRead) {
+        //if (cardRead) {  //redundant, since code won't reach here unless cardRead is true.
           if (!itsA4byte) {
             masterFound = checkmaster(readCard);
           } else {
             masterFound = checkmaster(smallCard);
           }
-        }
+        //}
 
         // If the card was master the leave learning mode.
         if (masterFound){
@@ -1337,6 +1337,9 @@ void loop() {
           #endif
 
           // Find where in the list the card to be removed is.
+
+          //TODO: findCardToRemove seems to be able to return nothing, what happens then?
+          //TODO: what happens if a user tries to remove a card that isn't in the list??
           card currentCard;
           if (!itsA4byte) {          
             currentCard = findCardtoRemove(readCard);
@@ -1375,67 +1378,29 @@ void loop() {
         }
 
         // Clear readCard arrays.
-        for (int i = 0; i < 7; i++) {
-          readCard[i] = 00;
-        }
-
-        for (int i = 0; i < 4; i++) {
-          smallCard[i] = 00;
-        }
-      
-        cardRead = false;
-        matchfound = false;
+        cleanup();
       }
     }
 
   #endif
 
+
   // If a match is found and the device is not already in an enabled state activate.
   if (matchFound && cardRead && !enabled) {
     authorised();
-    cardRead = false;
-    matchFound = false;
-
-    // Clear readCard array.
-    for (int i = 0; i < 7; i++) {
-      readCard[i] = 00;
-    }
-
-    for (int i = 0; i < 4; i++) {
-      smallCard[i] = 00;
-    }
+    cleanup();
   }
 
   // If a match is found and the device is already in an enabled state shutdown.
   if (matchFound && cardRead && enabled ) {
     shutdown();
-    cardRead = false;
-    matchFound = false;
-
-    // Clear readCard array.
-    for (int i = 0; i < 7; i++) {
-      readCard[i] = 00;
-    }
-
-    for (int i = 0; i < 4; i++) {
-      smallCard[i] = 00;
-    }
+    cleanup();
   }
 
   // If a match is not found unauthorised.
   if (!matchFound && cardRead) {
     unauthorised();
-    cardRead = false;
-    matchfound = false;
-
-    // Clear readCard array.
-    for (int i = 0; i < 7; i++) {
-      readCard[i] = 00;
-    }
-
-    for (int i = 0; i < 4; i++) {
-      smallCard[i] = 00;
-    }
+    cleanup();
    }
 
 }
