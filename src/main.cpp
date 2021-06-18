@@ -343,10 +343,8 @@ void authorised() {
 
       delay(relay1Delay); //delay x seconds ( for example to allow bike time to prime)
     }
-  #endif
-
+  
   // Relay two engaged and dissengaged after some time (for example the starter of a motorcycle)
-  #ifdef usingRelays
     if (enableRelay2 == true) {
       digitalWrite(relay2, HIGH);
       relay2State = HIGH;
