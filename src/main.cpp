@@ -18,6 +18,7 @@
 #define usingLED // Unmark this if you want to enable the RGB LED.
 #define usingBuzzer // Unmark this if you want to enable the Buzzer.
 #define usingRelays // Unmark this if you want to enable the Relays.
+#define sleep // Unmark this if you want to enable sleep mode (conserves battery).
 
 //-------Global variables and includes-------
 #include <Arduino.h>
@@ -66,11 +67,11 @@ byte smallCard[4] = {00,00,00,00};
 //-------MP3 player config-------
 #ifdef usingMP3
   // These are user defined variables.
-  int volume = 30; // Set the volume of the mp3 played 0~30.
-  int startupTrack = 1; // Track played when MP3 player boots.
-  int authorisedTrack = 2; // Track played when an autorised card / implant is scanned.
-  int unauthorisedTrack = 3; // Track played when an autorised card / implant is scanned.
-  int shutdownTrack = 4; // Track played when an autorised card / implant is scanned and the device is active.
+  #define volume 30 // Set the volume of the mp3 played 0~30.
+  #define startupTrack 1 // Track played when MP3 player boots.
+  #define authorisedTrack 2 // Track played when an autorised card / implant is scanned.
+  #define unauthorisedTrack 3 // Track played when an autorised card / implant is scanned.
+  #define shutdownTrack 4 // Track played when an autorised card / implant is scanned and the device is active.
 
   // These are needed to function, no touching.
   #include "SoftwareSerial.h"
@@ -89,9 +90,9 @@ byte smallCard[4] = {00,00,00,00};
   int unauthorisedBlinks = 3; // Number of times to blink if incorrect UID is scanned.
 
   // These are needed to function, no touching.
-  int RGBgreen = A1; // Rgb green.
-  int RGBblue = A2; // Rgb blue.
-  int RGBred = A3; // Rgb Red.
+  #define RGBgreen A1 // Rgb green.
+  #define RGBblue A2 // Rgb blue.
+  #define RGBred A3 // Rgb Red.
 
   int RGBgreenState = LOW; // State used to set the green LED.
   int RGBblueState = LOW; // State used to set the blue LED.
@@ -108,7 +109,7 @@ byte smallCard[4] = {00,00,00,00};
   int unauthorisedBuzzes = 3; // Number of times to buzz if incorrect UID is scanned.
 
   // These are needed to function, no touching.
-  int Buzzer = 4; // Onboard buzzer.
+  #define Buzzer 4 // Onboard buzzer.
 
   int BuzzerState = LOW;
 
@@ -125,8 +126,8 @@ byte smallCard[4] = {00,00,00,00};
   bool disableRelay2 = true; // this is to disable relay two after the delay.
 
   // These are needed to function, no touching.
-  int relay1 = 5; // Relay 1.
-  int relay2 = 6; // Relay 2.
+  #define relay1 5 // Relay 1.
+  #define relay2 6 // Relay 2.
 
   int relay1State = LOW; // State used to set relay 1.
   int relay2State = LOW; // State used to set relay 2.
