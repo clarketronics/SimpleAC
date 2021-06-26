@@ -1270,9 +1270,11 @@ void loop() {
             Serial.println(F("Exiting learning mode."));
           #endif 
 
-          // Flash led / beep a set number of times.
-          flashBeep(3, interval, RGBgreenState, RGBgreen);
-          flashBeep(1, interval, RGBblueState, RGBblue);
+          #ifdef usingLED
+            // Flash led / beep a set number of times.
+            flashBeep(3, interval, RGBgreenState, RGBgreen);
+            flashBeep(1, interval, RGBblueState, RGBblue);
+          #endif
 
           learningMode = false;
 
@@ -1401,9 +1403,6 @@ void loop() {
           #endif
 
           // Find where in the list the card to be removed is.
-
-          //TODO: findCardToRemove seems to be able to return nothing, what happens then?
-          //TODO: what happens if a user tries to remove a card that isn't in the list??
           card currentCard;
           if (!itsA4byte) {          
             currentCard = findCardtoRemove(readCard);
@@ -1434,7 +1433,9 @@ void loop() {
               flashBeep(1, interval, RGBredState, RGBred);
               flashBeep(1, interval, RGBblueState, RGBblue);
               flashBeep(1, interval, RGBredState, RGBred);
-            #endif            
+            #endif
+
+            return;            
           }
 
           // Remove the card from the linked list.

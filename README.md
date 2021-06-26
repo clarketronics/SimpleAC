@@ -39,7 +39,7 @@ Within the SimpleAC there are several flash / beep codes, some are specific to s
 | RRR | Not authorised |
 | RRB | No access cards defined |
 | RRG | No master defined, scan new master now |
-| RBR | |
+| RBR | Card to remove was not found |
 | RBB | |
 | RBG | |
 | RGR | Master scanned (clear mode), starts 10 second countdown |
