@@ -10,10 +10,10 @@
 */
 
 //-------Definitions- Delete the "//" of the modules you are using----------
-#define debug // Unmark this to enable output printing to the serial monitor.
+//#define debug // Unmark this to enable output printing to the serial monitor.
 //#define usingMP3 // Unmark this if using the df mp3player.
-#define usingRC522 // Unmark this if you are using the RC522 13.56MHz NFC-HF RFID reader.
-//#define usingPN532 // Unmark this if you are using the RC522 13.56MHz NFC-HF RFID reader.
+//#define usingRC522 // Unmark this if you are using the RC522 13.56MHz NFC-HF RFID reader.
+#define usingPN532 // Unmark this if you are using the RC522 13.56MHz NFC-HF RFID reader.
 //#define hardcodeUID // Unmark this if you want to hard code your UID's.
 #define usingLED // Unmark this if you want to enable the RGB LED.
 #define usingBuzzer // Unmark this if you want to enable the Buzzer.
@@ -57,7 +57,7 @@ byte smallCard[4] = {00,00,00,00};
 
 #ifdef usingPN532
   #include <SPI.h>
-  #include <PN532_SPI.h>
+  #include "PN532_SPI.h"
   #include "PN532.h"
 
   PN532_SPI pn532spi(SPI, 10); // Create an SPI instance of the PN532, (Interface, SS pin).
@@ -180,6 +180,50 @@ byte smallCard[4] = {00,00,00,00};
     return false;
   }
 
+#endif
+
+//-------Sleep config-------
+#ifdef sleep
+  // These are user defined variables.
+  long timeToWait = 10000; // The amount of time in millis to wait before sleeping.
+
+  // These are needed to function, no touching.
+  long currentMillis, startMillis; // To keep track of time and time since wake.
+  #define touchPin 3 // The pin the touch sensor connects to.
+
+  #include <avr/interrupt.h>
+  #include <avr/sleep.h>
+
+  // This is the code that runs when the interrupt button is pressed and interrupts are enabled.
+  void wakeUpNow() {}
+
+  // Lets go to sleep.
+  void sleepNow() {
+    sleep_enable(); // Enables the sleep mode.
+    attachInterrupt(0,wakeUpNow, HIGH);
+    set_sleep_mode(SLEEP_MODE_PWR_DOWN); // Sleep mode is set here.
+    
+    #ifdef usingRC522
+      mfrc522.PCD_SoftPowerDown(); // Set the power down bit to reduce power consumption.
+    #endif
+
+    #ifdef usingPN532
+      pn532.shutDown(PN532_WAKEUP_SPI); // Set the power down bit to reduce power consumption.
+    #endif
+
+    sleep_mode(); // This is where the device is actually put to sleep.
+
+    sleep_disable(); // First thing that is done is to disable the sleep mode.
+
+    #ifdef usingRC522
+      mfrc522.PCD_SoftPowerUp(); // Turn the reader back on.
+    #endif
+
+    detachInterrupt(0); // Disables the interrupt.
+
+    startMillis = millis(); // Set the last start up time.
+  }
+  
 #endif
 
 // If the uid is 4bytes followed by 3bytes of 00 remove them.
@@ -359,7 +403,12 @@ void authorised() {
     }
   #endif
 
+  // Set enabled flag.
   enabled = true;
+  
+  #ifdef sleep
+    startMillis = millis(); // Reset timeout counter.
+  #endif
 }
 
 // If UID is incorrect do this.
@@ -401,6 +450,10 @@ void unauthorised() {
     digitalWrite(RGBred, LOW);    
   }
 
+  #ifdef sleep
+    startMillis = millis(); // Reset timeout counter.
+  #endif
+
 }
 
 // If scan has been authorised previously were going to cut power.
@@ -438,6 +491,10 @@ void shutdown() {
 
   // Reset enabled flag.
   enabled = false;
+
+  #ifdef sleep
+    startMillis = millis(); // Reset timeout counter.
+  #endif
 
 }
 
@@ -946,6 +1003,10 @@ void setup() {
     }
 
   #endif
+
+  #ifdef sleep
+    pinMode(touchPin, INPUT);
+  #endif
 }
 
 // Main loop.
@@ -1379,7 +1440,6 @@ void loop() {
 
   #endif
 
-
   // If a match is found and the device is not already in an enabled state activate.
   if (matchFound && cardRead && !enabled) {
     authorised();
@@ -1398,4 +1458,11 @@ void loop() {
     cleanup();
    }
 
+  #ifdef sleep
+    // Should we sleep yet?
+    currentMillis = millis();
+    if(currentMillis >= startMillis + timeToWait) {
+      sleepNow();
+    }
+  #endif
 }
