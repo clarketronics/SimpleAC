@@ -369,7 +369,9 @@ void authorised() {
   #endif
 
   // Flash led / beep a set number of times.
+  #ifdef usingLED
   flashBeep(authorisedStates, interval, RGBgreenState, RGBgreen);
+  #endif
 
   // Play the track assigned when a authorised card / implant is scanned.
   #if defined (usingmp3player)
