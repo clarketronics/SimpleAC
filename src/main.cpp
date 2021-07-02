@@ -5,7 +5,7 @@
   * If LED's and Buzzer are enabled the interval between blinks / buzzes 
     will be which ever value is greater.
 
-  * Pull LT pin (D2) LOW at startup without defining hardcodedUID and you will enter a clear mode
+  * Pull LT pin (D2) LOW at startup and you will enter a clear mode
     (this is shown by serial messages, 3 blue LED flashes and beeps) to clear the eeprom.
 */
 
@@ -14,7 +14,6 @@
 //#define usingMP3 // Unmark this if using the df mp3player.
 //#define usingRC522 // Unmark this if you are using the RC522 13.56MHz NFC-HF RFID reader.
 #define usingPN532 // Unmark this if you are using the RC522 13.56MHz NFC-HF RFID reader.
-//#define hardcodeUID // Unmark this if you want to hard code your UID's.
 #define usingLED // Unmark this if you want to enable the RGB LED.
 #define usingBuzzer // Unmark this if you want to enable the Buzzer.
 #define usingRelays // Unmark this if you want to enable the Relays.
@@ -24,8 +23,8 @@
 #include <Arduino.h>
 #include <EEPROM.h>
 #define unauthScanCountLocation 2
-bool matchfound, enabled, cardRead;
-unsigned int authorisedOutputs, unauthorisedOutputs, authorisedStates, unauthorisedStates, interval;
+bool enabled;
+unsigned int authorisedOutputs, unauthorisedOutputs, authorisedStates, unauthorisedStates, interval, state;
 long lockout[] = {60000, 120000, 300000, 900000};
 byte readCard[7] = {00,00,00,00,00,00,00};
 byte smallCard[4] = {00,00,00,00};
@@ -33,19 +32,6 @@ byte smallCard[4] = {00,00,00,00};
 // Catch idiots defining both reader.
 #if defined(usingRC522) && defined(usingPN532) 
 #error "You can't define both readers at the same time!."
-#endif
-
-//-------Hardcoded UID's-------
-#ifdef hardcodeUID
-  // Change the number in the first [] to the number of UID's wanted put the UID's in brackets as shown.
-  // NOTE: The last row dosnt need a comma.
-  byte uids[2][7] = {
-  {0x04, 0x73, 0x08, 0x3A, 0x94, 0x51, 0x80},
-  {0x04, 0x5B, 0x32, 0x22, 0x2F, 0x5C, 0x91},
-  };
-
-  // A function to calculate the number of items in an array.
-  #define numberofitems(arg) ((unsigned int) (sizeof (arg) / sizeof (arg [0])))
 #endif
 
 //-------Reader config-------
@@ -133,62 +119,71 @@ byte smallCard[4] = {00,00,00,00};
   int relay2State = LOW; // State used to set relay 2.
 #endif
 
+//-------State machine config-------
+#define startOfDay 0
+#define waitingOnCard 1
+#define cardReadSuccessfully 2
+#define cardIs4Byte 3
+#define cardIs7Byte 4
+#define cardIs4ByteMaster 31
+#define cardIs4ByteAccess 32
+#define cardIs7ByteMaster 41
+#define cardIs7ByteAccess 42
+#define goToSleep 50
+#define noMatch 60
+
 //-------Programmable uid config-------            
-#ifndef hardcodeUID
-  // These are needed to function, no touching.
-  #include <linkedlist.h>
-  #define clearButton A0 // The pin to monitor on start up to enter clear mode.
-  int cardCount, masterSize;
-  bool scorchedEarth, eepromRead;
-  bool itsA4byte = false;
-  byte masterCard[7] = {00,00,00,00,00,00,00};
-  byte errorUID[7] = {0x45, 0x52, 0x52, 0x4f, 0x52, 0x21, 0x21};
+#include <linkedlist.h>
+#define clearButton A0 // The pin to monitor on start up to enter clear mode.
+int cardCount, masterSize;
+bool clearEeprom, eepromRead;
+bool itsA4byte = false;
+byte masterCard[7] = {00,00,00,00,00,00,00};
+byte errorUID[7] = {0x45, 0x52, 0x52, 0x4f, 0x52, 0x21, 0x21};
 
-  #define masterDefinedLocation 0
-  #define cardCountLocation 1
-  #define masterUIDSizeLocation 3
+#define masterDefinedLocation 0
+#define cardCountLocation 1
+#define masterUIDSizeLocation 3
 
-  class card {
-    public:
-      byte uid[7];
-      int size;
-      int index;
-  };
+class card {
+  public:
+    byte uid[7];
+    int size;
+    int index;
+};
 
-  LinkedList<card> authorisedCards = LinkedList<card>();
+LinkedList<card> authorisedCards = LinkedList<card>();
 
-  // Read a UID byte from the eeprom.
-  byte readUIDbit(int startPosition, int index) {       
-    return EEPROM.read(startPosition + index);
+// Read a UID byte from the eeprom.
+byte readUIDbit(int startPosition, int index) {       
+  return EEPROM.read(startPosition + index);
+}
+
+// Find the card to remove from list
+card findCardtoRemove(byte readCard[]){
+  // Define a card that will be returned if scanned card is not in list.
+  card errorCard;
+  for (int i = 0; i < 7; i++) {
+    memcpy(errorCard.uid + i, errorUID + i, 1);
   }
 
-  // Find the card to remove from list
-  card findCardtoRemove(byte readCard[]){
-    // Define a card that will be returned if scanned card is not in list.
-    card errorCard;
-    for (int i = 0; i < 7; i++) {
-      memcpy(errorCard.uid + i, errorUID + i, 1);
+  // Try to find the card in the list.
+  for (int i = 0; i < authorisedCards.size(); i++){
+    card curentCard = authorisedCards.get(i);
+    if (memcmp(curentCard.uid, readCard, curentCard.size) == 0){
+      return curentCard;
     }
+  }
+  return errorCard;
+}
 
-    // Try to find the card in the list.
-    for (int i = 0; i < authorisedCards.size(); i++){
-      card curentCard = authorisedCards.get(i);
-      if (memcmp(curentCard.uid, readCard, curentCard.size) == 0){
-        return curentCard;
-      }
+// Check read card against master uid
+bool checkmaster(byte readCard[]){
+    if (memcmp(masterCard, readCard, masterSize) == 0){
+      return true;
     }
-    return errorCard;
-  }
-
-  // Check read card against master uid
-  bool checkmaster(byte readCard[]){
-      if (memcmp(masterCard, readCard, masterSize) == 0){
-        return true;
-      }
-    return false;
-  }
-
-#endif
+  return false;
+}
 
 //-------Sleep config-------
 #ifdef sleep
@@ -222,6 +217,8 @@ byte smallCard[4] = {00,00,00,00};
     sleep_mode(); // This is where the device is actually put to sleep.
 
     sleep_disable(); // First thing that is done is to disable the sleep mode.
+
+    state = waitingOnCard;
 
     #ifdef usingRC522
       mfrc522.PCD_SoftPowerUp(); // Turn the reader back on.
@@ -509,17 +506,7 @@ void shutdown() {
 }
 
 // Check read card against authorised uid's
-bool checkcard(byte readCard[]){
-  #ifdef hardcodeUID
-    for (unsigned int i = 0; i < numberofitems(uids); i++){
-      if (memcmp(uids[i], readCard, sizeof(uids[i])) == 0){
-        return true;
-      }
-    }
-    return false;
-  #endif
-
-  #ifndef hardcodeUID
+bool checkCard(byte readCard[]){
     for (int i = 0; i < authorisedCards.size(); i++){
       card curentCard = authorisedCards.get(i);
       int size = sizeof(readCard);
@@ -528,7 +515,6 @@ bool checkcard(byte readCard[]){
       }
     }
     return false;
-  #endif
 }
 
 // Attempts to read a card from the RC522.
@@ -581,7 +567,7 @@ bool checkcard(byte readCard[]){
 
 // Blocks until a card is present at the reader.
 void waitForCard(){ 
-    cardRead = false;
+    bool cardRead = false;
     while (!cardRead) {
       #ifdef usingRC522
         cardRead = rc522Read();
@@ -594,109 +580,104 @@ void waitForCard(){
 }
 
 // Clear meathods when using master cards.
-#ifndef hardcodeUID
-  // Clear button held during boot
-  bool monitorClearButton(uint32_t interval) {
-      uint32_t now = (uint32_t)millis();
-      while ((uint32_t)millis() - now < interval)  {
-        // check on every half a second
-        if (((uint32_t)millis() % 500) == 0) {
-          if (digitalRead(clearButton) != HIGH)
-            return false;
-        }
+// Clear button held during boot
+bool monitorClearButton(uint32_t interval) {
+    uint32_t now = (uint32_t)millis();
+    while ((uint32_t)millis() - now < interval)  {
+      // check on every half a second
+      if (((uint32_t)millis() % 500) == 0) {
+        if (digitalRead(clearButton) != HIGH)
+          return false;
       }
-      return true;
     }
+    return true;
+  }
 
-  // If programming button pulled low during boot then do this.
-  void cleanSlate() {
+// If programming button pulled low during boot then do this.
+void cleanSlate() {
 
-    // Flash led / beep a set number of times.
-    flashBeep(5, interval, RGBblueState, RGBblue);
+  // Flash led / beep a set number of times.
+  flashBeep(5, interval, RGBblueState, RGBblue);
 
-    // Print a serial message (if enabled).
+  // Print a serial message (if enabled).
+  #ifdef debug
+    Serial.println(F("-------------------"));
+    Serial.println(F("Clear mode!"));
+    Serial.println(F("Please release the clear button / ground connection. Once released we can continue."));
+  #endif
+
+  // Wait until the programming button / pin goes high.
+  while (digitalRead(clearButton) == LOW) {}
+
+  // Print serial message (if enabled).
+  #ifdef debug
+    Serial.println(F("-------------------"));
+    Serial.println(F("Scan master card to clear all cards"));
+    Serial.println(F("Reset to resume normal opperation"));
+  #endif
+
+  // Wait until we scan a card befor continuing.
+  waitForCard();
+
+  // Read Master Card's UID from EEPROM
+  for ( int i = 0; i < masterSize; i++ ) {          
+    masterCard[i] = EEPROM.read(masterUIDSizeLocation + 1 + i);
+  }
+
+  #ifdef debug
+    PrintHex8(masterCard, masterSize); // Print each character of the mastercard UID.
+    Serial.println("");
+  #endif
+
+  // See if scanned card is the master.
+  if (checkmaster(readCard)) {
     #ifdef debug
       Serial.println(F("-------------------"));
-      Serial.println(F("Clear mode!"));
-      Serial.println(F("Please release the clear button / ground connection. Once released we can continue."));
+      Serial.println(F("This is your last chance"));
+      Serial.println(F("You have 10 seconds to Cancel"));
+      Serial.println(F("This will be remove all records and cannot be undone"));
     #endif
 
-    // Wait until the programming button / pin goes high.
-    while (digitalRead(clearButton) == LOW) {}
+    // Flash led / beep a set number of times.
+    flashBeep(1, interval, RGBredState, RGBred);      
+    flashBeep(1, interval, RGBgreenState, RGBgreen);
+    flashBeep(1, interval, RGBredState, RGBred);
 
-    // Print serial message (if enabled).
+    bool buttonState = monitorClearButton(10000); // Wait for the button to be pressed for 10 seconds.
+
+    // If button still be pressed, wipe EEPROM
+    if (buttonState && digitalRead(clearButton) == HIGH) {      
+      // Loop through eeprom and remove everything.
+      for (unsigned int i = 0 ; i < EEPROM.length() ; i++) {
+        EEPROM.update(i, 0);
+      }
+
+      #ifdef debug
+        Serial.println(F("-------------------"));
+        Serial.println(F("All data erased from device"));
+        Serial.println(F("Please reset to re-program Master Card"));
+      #endif
+
+      // turn the green LED on when we're done
+      digitalWrite(RGBgreen, HIGH);
+
+      // Halt.
+      while (1);
+    }
     #ifdef debug
       Serial.println(F("-------------------"));
-      Serial.println(F("Scan master card to clear all cards"));
+      Serial.println(F("Master Card Erase Cancelled"));
       Serial.println(F("Reset to resume normal opperation"));
     #endif
 
-    // Wait until we scan a card befor continuing.
-    waitForCard();
 
-    // Read Master Card's UID from EEPROM
-    for ( int i = 0; i < masterSize; i++ ) {          
-      masterCard[i] = EEPROM.read(masterUIDSizeLocation + 1 + i);
-    }
-
-    #ifdef debug
-      PrintHex8(masterCard, masterSize); // Print each character of the mastercard UID.
-      Serial.println("");
-    #endif
-
-    // See if scanned card is the master.
-    if (checkmaster(readCard)) {
-      #ifdef debug
-        Serial.println(F("-------------------"));
-        Serial.println(F("This is your last chance"));
-        Serial.println(F("You have 10 seconds to Cancel"));
-        Serial.println(F("This will be remove all records and cannot be undone"));
-      #endif
-
-      // Flash led / beep a set number of times.
-      flashBeep(1, interval, RGBredState, RGBred);      
-      flashBeep(1, interval, RGBgreenState, RGBgreen);
-      flashBeep(1, interval, RGBredState, RGBred);
-
-      bool buttonState = monitorClearButton(10000); // Wait for the button to be pressed for 10 seconds.
-
-      // If button still be pressed, wipe EEPROM
-      if (buttonState && digitalRead(clearButton) == HIGH) {      
-        // Loop through eeprom and remove everything.
-        for (unsigned int i = 0 ; i < EEPROM.length() ; i++) {
-          EEPROM.update(i, 0);
-        }
-
-        #ifdef debug
-          Serial.println(F("-------------------"));
-          Serial.println(F("All data erased from device"));
-          Serial.println(F("Please reset to re-program Master Card"));
-        #endif
-
-        // turn the green LED on when we're done
-        digitalWrite(RGBgreen, HIGH);
-
-        // Halt.
-        while (1);
-      }
-      #ifdef debug
-        Serial.println(F("-------------------"));
-        Serial.println(F("Master Card Erase Cancelled"));
-        Serial.println(F("Reset to resume normal opperation"));
-      #endif
-
-
-      // Halt, user needs to power cycle.
-      while (1);
-    }    
-  } 
-#endif
+    // Halt, user needs to power cycle.
+    while (1);
+  }    
+} 
 
 //clear card read arrays and reset readstate booleans:
 void cleanup(){
-    cardRead = false;
-    matchfound = false;
-
     // Clear readCard array.
     for (int i = 0; i < 7; i++) {
       readCard[i] = 00;
@@ -705,6 +686,388 @@ void cleanup(){
     for (int i = 0; i < 4; i++) {
       smallCard[i] = 00;
     }
+}
+
+// Read all values from eeprom at start of day.
+void onBoot(){
+  // Check to see if we are entering clearing mode.
+  if (digitalRead(clearButton) == LOW) {
+    cleanSlate();
+  }
+
+  // Check if master is defined, halt if not.
+  if (EEPROM.read(masterDefinedLocation) != 143) {
+    #ifdef debug
+      Serial.println(F("-------------------"));
+      Serial.println(F("No master card defined."));
+      Serial.println(F("Please scan a master card.")); 
+      Serial.println(F("-------------------"));
+    #endif
+
+    // Flash led / beep a set number of times.
+    flashBeep(3, interval, RGBredState, RGBred);
+    flashBeep(1, interval, RGBgreenState, RGBgreen);
+
+    // Wait until we scan a card befor continuing.
+    waitForCard();
+
+    // Check to see if 4 or 7 byte uid.
+    itsA4byte = check4Byte();
+
+    // Write the scanned card to the eeprom as the master card.
+    if (!itsA4byte) {
+      EEPROM.update(masterUIDSizeLocation, 7);
+      masterSize = 7;
+      for (unsigned int i = 0; i < 7; i++ ) {        
+        EEPROM.update(masterUIDSizeLocation + 1 + i, readCard[i]);  // Write scanned PICC's UID to EEPROM, start from address 3
+      }
+    } else {
+      masterSize = 4;
+      EEPROM.update(masterUIDSizeLocation, 4);
+      for (unsigned int i = 0; i < 4; i++ ) {        
+        EEPROM.update(masterUIDSizeLocation + 1 + i, smallCard[i]);  // Write scanned PICC's UID to EEPROM, start from address 3
+      }
+    }
+
+    // Print the mastercard UID.
+    #ifdef debug
+      if (!itsA4byte) {
+          PrintHex8(readCard, 7); 
+          Serial.println("");
+      } else {
+        PrintHex8(smallCard, 4); 
+        Serial.println("");
+      }
+    #endif
+
+    // Write to EEPROM we defined Master Card.
+    EEPROM.update(masterDefinedLocation, 143);
+
+  }
+
+  // Read the number of cards currently stored, not including master.
+  cardCount = EEPROM.read(cardCountLocation);
+
+  // Read the master card and place in memory.
+  masterSize = EEPROM.read(masterUIDSizeLocation);
+
+  for (int i = 0; i < masterSize; i++) {
+    byte recievedByte = readUIDbit(masterUIDSizeLocation + 1, i);
+    memcpy(masterCard + i, &recievedByte, 1);
+  }
+
+  // Read access cards and place in memory.
+  if (cardCount != 0) {
+    // Itterate through the number of cards.
+    int startPos = masterUIDSizeLocation + masterSize + 1;
+    
+    for (int i = 0; i < cardCount; i++) {
+      // Read cards size.
+      int size = EEPROM.read(startPos);
+
+      // initialise a array of the cards size.
+      byte buffer[size];
+      for (int i = 0; i < size; i++) {
+        buffer[i] = 00;
+      }
+
+      startPos++;
+      // Reads each card UID from eeprom byte by byte.
+      for (int j = 0; j < size; j++) {
+        byte recievedByte = readUIDbit(startPos, j);
+        memcpy(buffer + j, &recievedByte, 1);
+      }
+
+      // Creates a card and sets UID and its index (place in list).
+      card currentCard;
+      
+      for (int j = 0; j < size; j++) {
+        memcpy(currentCard.uid + j, buffer + j, 1);
+      }
+
+      currentCard.index = i;
+      currentCard.size = size;
+
+      // Adds the card the the linked list (where it is referenced from during run time).
+      authorisedCards.add(currentCard);
+
+      startPos = startPos + size;
+
+      // Print out card details.
+      #ifdef debug
+        Serial.println(F("-------------------"));
+        Serial.print(F("Card number: "));
+        Serial.println(currentCard.index);
+        Serial.print(F("Card size in bytes: "));
+        Serial.println(currentCard.size);
+        Serial.print(F("Card uid: "));
+        PrintHex8(currentCard.uid, currentCard.size);
+        Serial.println(F(""));
+      #endif
+    }
+    // Output to show number of access cards defined.
+    #ifdef debug
+      Serial.println(F("-------------------"));          
+      Serial.print(F("There are "));
+      Serial.print(cardCount);
+      Serial.print(F(" access cards defined."));
+      Serial.println("");
+    #endif        
+
+  } else {
+    // Output to show no access cards defined.
+    #ifdef debug
+      Serial.println(F("-------------------"));
+      Serial.println(F("No access cards defined."));
+      Serial.println(F("Scan master card to add access cards"));
+    #endif
+
+    // Flash led / beep a set number of times.
+    flashBeep(3, interval, RGBredState, RGBred);
+    flashBeep(1, interval, RGBblueState, RGBblue);
+  }
+
+  // Clear readCard arrays.
+  for (int i = 0; i < 7; i++) {
+    readCard[i] = 00;
+  }
+
+  for (int i = 0; i < 4; i++) {
+    smallCard[i] = 00;
+  }
+
+  eepromRead = true;
+}
+
+// Learning mode (add and remove cards).
+void learning(){
+  bool learning = true;
+
+  while (learning){
+    // Wait for a card to be scanned.
+    waitForCard();
+    
+    // Check if scanned card was master. 
+    bool masterFound = false;
+    bool cardDefined = false;
+    
+    if (!check4Byte()) {
+      masterFound = checkmaster(readCard);
+    } else {
+      masterFound = checkmaster(smallCard);
+    }
+
+    // If the card was master the leave learning mode.
+    if (masterFound){
+      // Output to show leaving learing mode.
+      #ifdef debug
+        Serial.println(F("-------------------"));
+        Serial.println(F("Master scanned."));
+        Serial.println(F("Exiting learning mode."));
+      #endif 
+
+      #ifdef usingLED
+        // Flash led / beep a set number of times.
+        flashBeep(3, interval, RGBgreenState, RGBgreen);
+        flashBeep(1, interval, RGBblueState, RGBblue);
+      #endif
+
+      // Clear readCard array.
+      cleanup();
+
+      // Reset sleep timer.
+      startMillis = millis();
+
+      learning = false;
+      state = waitingOnCard;
+
+      return;
+    } else {
+      // Card was not master, is it defined?
+      if (!check4Byte()) {
+        cardDefined = checkCard(readCard);
+      } else {
+        cardDefined = checkCard(smallCard);
+      }
+
+      // If the card is not defined add it to memory.
+      if (!cardDefined) {
+        // Print message to say it will be added to memory.
+        #ifdef debug
+          if (!check4Byte()){
+            Serial.println(F("-------------------"));
+            Serial.println(F("Scanned card had a UID of."));
+            PrintHex8(readCard, 7);
+            Serial.println("");
+            Serial.println(F("It will be added to memory."));
+          } else {
+            Serial.println(F("-------------------"));
+            Serial.println(F("Scanned card had a UID of."));
+            PrintHex8(smallCard, 4);
+            Serial.println("");
+            Serial.println(F("It will be added to memory."));
+          }
+        #endif
+
+        // Create a start position.
+        int startPos = masterUIDSizeLocation + masterSize + 1;
+
+        // Find the next place to write the card.
+        for (int i = 0; i < authorisedCards.size(); i++) {
+          card myCard = authorisedCards.get(i);
+          startPos = startPos + myCard.size + 1;
+        }
+
+        if (!check4Byte()){ 
+          // Create a card instance for the scanned card.
+          card currentCard;
+          
+          for (int j = 0; j < 7; j++) {
+            memcpy(currentCard.uid + j, readCard + j, 1);
+          }
+
+          currentCard.size = 7;
+          currentCard.index = cardCount;            
+          
+          // Write uid size in bytes.
+          EEPROM.update(startPos, currentCard.size);
+          startPos++;
+
+          // Write uid of card to eeprom.
+          for (int i = 0; i < 7; i++) {
+            EEPROM.update(startPos + i, readCard[i]);
+          }
+
+          // add the scanned card to the list
+          authorisedCards.add(currentCard);
+
+        } else {
+          // Create a card instance for the scanned card.
+          card currentCard;
+          
+          for (int j = 0; j < 4; j++) {
+            memcpy(currentCard.uid + j, readCard + j, 1);
+          }
+
+          currentCard.size = 4;
+          currentCard.index = cardCount;
+        
+          // Write uid size in bytes.
+          EEPROM.update(startPos, currentCard.size);
+          startPos++;
+
+          // Write uid of card to eeprom.
+          for (int i = 0; i < 4; i++) {
+            EEPROM.update(startPos + i, smallCard[i]);
+          }
+
+          // add the scanned card to the list
+          authorisedCards.add(currentCard);
+        }
+
+        // Update the number of known cards.
+        cardCount++;
+        EEPROM.update(cardCountLocation, cardCount);
+
+        #ifdef usingLED
+          // Flash led / beep a set number of times.
+          flashBeep(3, interval, RGBblueState, RGBblue);
+          flashBeep(1, interval, RGBgreenState, RGBgreen);
+        #endif
+
+        // Gives the user a second to pull the card away.
+        delay(1000);
+
+      }
+
+      // If the card is defined remove it from memory.
+      if (cardDefined) {
+        // Print card is defined.
+        #ifdef debug
+          if (!check4Byte()){
+            Serial.println(F("-------------------"));
+            Serial.println(F("Scanned card had a UID of."));
+            PrintHex8(readCard, 7);
+            Serial.println("");
+            Serial.println(F("It will be removed from memory."));
+          } else {
+            Serial.println(F("-------------------"));
+            Serial.println(F("Scanned card had a UID of."));
+            PrintHex8(smallCard, 4);
+            Serial.println("");
+            Serial.println(F("It will be removed from memory."));
+          }
+        #endif
+
+        // Find where in the list the card to be removed is.
+        card currentCard;
+        if (!check4Byte()) {          
+          currentCard = findCardtoRemove(readCard);
+        } else {
+          currentCard = findCardtoRemove(smallCard);
+        }
+
+        // Check to see if the current card is the errorUID (ERROR!!).
+        if (memcmp(currentCard.uid, errorUID, 7) == 0) {
+          #ifdef debug
+            if (!check4Byte()){
+            Serial.println(F("-------------------"));
+            Serial.println(F("Scanned card had a UID of."));
+            PrintHex8(readCard, 7);
+            Serial.println("");
+            Serial.println(F("It was not found."));
+          } else {
+            Serial.println(F("-------------------"));
+            Serial.println(F("Scanned card had a UID of."));
+            PrintHex8(smallCard, 4);
+            Serial.println("");
+            Serial.println(F("It was not found."));
+          }
+          #endif
+          
+          #ifdef usingLED
+            // Flash led / beep a set number of times.
+            flashBeep(1, interval, RGBredState, RGBred);
+            flashBeep(1, interval, RGBblueState, RGBblue);
+            flashBeep(1, interval, RGBredState, RGBred);
+          #endif
+
+          return;            
+        }
+
+        // Remove the card from the linked list.
+        authorisedCards.remove(currentCard.index);
+
+        // Go through the eeprom and remove the blank space.
+        int startPos = masterUIDSizeLocation + masterSize + 1;
+        for (int i = 0; i < authorisedCards.size(); i++) {
+          card myCard = authorisedCards.get(i);
+          EEPROM.update(startPos, myCard.size);
+          startPos++;
+
+          for (int j = 0; j < myCard.size; j++) {
+            EEPROM.update(startPos + j, myCard.uid[j]);
+          }
+
+          startPos = startPos + myCard.size;
+
+        }
+
+        // Update the number of known cards.
+        cardCount--;
+        EEPROM.update(cardCountLocation, cardCount);
+
+        #ifdef usingLED  
+          // Flash led / beep a set number of times.
+          flashBeep(3, interval, RGBblueState, RGBblue);
+          flashBeep(1, interval, RGBredState, RGBred);
+        #endif
+
+        // Gives the user a second to pull the card away.
+        delay(1000);
+      }
+    }
+  }
 }
 
 // Setup.
@@ -966,16 +1329,9 @@ void setup() {
     #endif      
   #endif
 
-  #ifndef hardcodeUID
-    // Setup the clear button for clearing eeprom.
-    pinMode(clearButton, INPUT);
-    digitalWrite(clearButton, HIGH);
-
-    // Check if button is pressed.
-    if (digitalRead(clearButton) == LOW) {
-      scorchedEarth = true;
-    }
-  #endif
+  // Setup the clear button for clearing eeprom.
+  pinMode(clearButton, INPUT);
+  digitalWrite(clearButton, HIGH);
 
   #if defined(usingLED) && defined(usingBuzzer)
     // Set the number of flashes and beeps to the greater of the 2 inputs.
@@ -1021,209 +1377,63 @@ void setup() {
 
 // Main loop.
 void loop() {
-
-  #ifndef hardcodeUID
-    
-    // Read all values from eeprom, only once needed.
-    if (!eepromRead) {
-
-      // Check to see if we are entering clearing mode.
-      if (scorchedEarth == true) {
-        cleanSlate();
-      }
-
-      // Check if master is defined, halt if not.
-      if (EEPROM.read(masterDefinedLocation) != 143) {
-        #ifdef debug
-          Serial.println(F("-------------------"));
-          Serial.println(F("No master card defined."));
-          Serial.println(F("Please scan a master card.")); 
-          Serial.println(F("-------------------"));
-        #endif
-
-        // Flash led / beep a set number of times.
-        flashBeep(3, interval, RGBredState, RGBred);
-        flashBeep(1, interval, RGBgreenState, RGBgreen);
-
-        // Wait until we scan a card befor continuing.
-        waitForCard();
-
-        // Check to see if 4 or 7 byte uid.
-        itsA4byte = check4Byte();
-
-        // Write the scanned card to the eeprom as the master card.
-        if (!itsA4byte) {
-          EEPROM.update(masterUIDSizeLocation, 7);
-          masterSize = 7;
-          for (unsigned int i = 0; i < 7; i++ ) {        
-            EEPROM.update(masterUIDSizeLocation + 1 + i, readCard[i]);  // Write scanned PICC's UID to EEPROM, start from address 3
-          }
+  // State machine!
+  switch (state) {
+    case startOfDay:
+      onBoot();
+      state = waitingOnCard;
+      startMillis = millis();
+    break;
+    case waitingOnCard:
+      // Try to read a card.
+      #ifdef usingRC522
+        // Try and read a card.
+        if (rc522Read()) {
+          state = cardReadSuccessfully;
         } else {
-          masterSize = 4;
-          EEPROM.update(masterUIDSizeLocation, 4);
-          for (unsigned int i = 0; i < 4; i++ ) {        
-            EEPROM.update(masterUIDSizeLocation + 1 + i, smallCard[i]);  // Write scanned PICC's UID to EEPROM, start from address 3
-          }
+          state = waitingOnCard;
         }
+      #endif
 
-        // Print the mastercard UID.
-        #ifdef debug
-          if (!itsA4byte) {
-              PrintHex8(readCard, 7); 
-              Serial.println("");
-          } else {
-            PrintHex8(smallCard, 4); 
-            Serial.println("");
-          }
-        #endif
-
-        // Write to EEPROM we defined Master Card.
-        EEPROM.update(masterDefinedLocation, 143);
-
-      }
-
-      // Read the number of cards currently stored, not including master.
-      cardCount = EEPROM.read(cardCountLocation);
-
-      // Read the master card and place in memory.
-      masterSize = EEPROM.read(masterUIDSizeLocation);
-
-      for (int i = 0; i < masterSize; i++) {
-        byte recievedByte = readUIDbit(masterUIDSizeLocation + 1, i);
-        memcpy(masterCard + i, &recievedByte, 1);
-      }
-
-      // Read access cards and place in memory.
-      if (cardCount != 0) {
-        // Itterate through the number of cards.
-        int startPos = masterUIDSizeLocation + masterSize + 1;
-        
-        for (int i = 0; i < cardCount; i++) {
-          // Read cards size.
-          int size = EEPROM.read(startPos);
-
-          // initialise a array of the cards size.
-          byte buffer[size];
-          for (int i = 0; i < size; i++) {
-            buffer[i] = 00;
-          }
-
-          startPos++;
-          // Reads each card UID from eeprom byte by byte.
-          for (int j = 0; j < size; j++) {
-            byte recievedByte = readUIDbit(startPos, j);
-            memcpy(buffer + j, &recievedByte, 1);
-          }
-
-          // Creates a card and sets UID and its index (place in list).
-          card currentCard;
-          
-          for (int j = 0; j < size; j++) {
-            memcpy(currentCard.uid + j, buffer + j, 1);
-          }
-
-          currentCard.index = i;
-          currentCard.size = size;
-
-          // Adds the card the the linked list (where it is referenced from during run time).
-          authorisedCards.add(currentCard);
-
-          startPos = startPos + size;
-
-          // Print out card details.
-          #ifdef debug
-            Serial.println(F("-------------------"));
-            Serial.print(F("Card number: "));
-            Serial.println(currentCard.index);
-            Serial.print(F("Card size in bytes: "));
-            Serial.println(currentCard.size);
-            Serial.print(F("Card uid: "));
-            PrintHex8(currentCard.uid, currentCard.size);
-            Serial.println(F(""));
-          #endif
-        }
-        // Output to show number of access cards defined.
-        #ifdef debug
-          Serial.println(F("-------------------"));          
-          Serial.print(F("There are "));
-          Serial.print(cardCount);
-          Serial.print(F(" access cards defined."));
-          Serial.println("");
-        #endif        
-
+      #ifdef usingPN532
+        // Try and read a card.
+        if (pn532Read()) {
+          state = cardReadSuccessfully;
+        } else {
+          state = waitingOnCard;
+        }        
+      #endif
+    break;
+    case cardReadSuccessfully:
+      // Check to see if card is 4 byte or not.
+      if (check4Byte()) {
+        state = cardIs4Byte;
       } else {
-        // Output to show no access cards defined.
-        #ifdef debug
-          Serial.println(F("-------------------"));
-          Serial.println(F("No access cards defined."));
-          Serial.println(F("Scan master card to add access cards"));
-        #endif
-
-        // Flash led / beep a set number of times.
-        flashBeep(3, interval, RGBredState, RGBred);
-        flashBeep(1, interval, RGBblueState, RGBblue);
+        state = cardIs7Byte;
       }
-
-      // Clear readCard arrays.
-      for (int i = 0; i < 7; i++) {
-        readCard[i] = 00;
-      }
-
-      for (int i = 0; i < 4; i++) {
-        smallCard[i] = 00;
-      }
-
-      eepromRead = true;
-    }
-  #endif
-  
-  #ifdef usingRC522
-    cardRead = rc522Read();
-  #endif
-
-  #ifdef usingPN532
-    cardRead = pn532Read();        
-  #endif
-
-  #ifndef hardcodeUID
-    if (cardRead) {
-      itsA4byte = check4Byte();  
-    }
-  #endif
-
-  #ifdef hardcodeUID
-    // match found flag.
-    bool matchFound = false;
-
-    // Check whether the card read is known.
-    if (cardRead) {
-      matchFound = checkcard(readCard);
-    }
-  #endif
-
-  #ifndef hardcodeUID
-    // master found flag.
-    bool masterFound = false;
-
-    // match found flag.
-    bool matchFound = false;
-
-    // Check whether the card read is master or even known.
-    if (cardRead) {
-      if (!itsA4byte) {
-        masterFound = checkmaster(readCard);
-        matchFound = checkcard(readCard);
+    break;
+    case cardIs4Byte:
+      // Check whether the card read is master or even known.
+      if (checkmaster(smallCard)) {
+        state = cardIs4ByteMaster;
+      } else if (checkCard(smallCard)) {
+        state = cardIs4ByteAccess;
       } else {
-        masterFound = checkmaster(smallCard);
-        matchFound = checkcard(smallCard);
+        state = noMatch;
+      }      
+    break;
+    case cardIs7Byte:
+      // Check whether the card read is master or even known.
+      if (checkmaster(readCard)) {
+        state = cardIs7ByteMaster;
+      } else if (checkCard(readCard)) {
+        state = cardIs7ByteAccess;
+      } else {
+        state = noMatch;
       }
-    }
-
-    // Learning mode.
-    if (cardRead && masterFound) {
-      // Learning mode flag.
-      bool learningMode = true;
-
+    break;
+    case cardIs7ByteMaster:
+    case cardIs4ByteMaster:
       // Output to show entered learing mode.
       #ifdef debug
         Serial.println(F("-------------------"));
@@ -1237,274 +1447,49 @@ void loop() {
         flashBeep(1, interval, RGBblueState, RGBblue);
       #endif
 
+      // Clear read card arrays.
+      cleanup();
+
+      // Enter learning mode (this is blocking).
+      learning();
+
+      // Reset sleep timer.
+      startMillis = millis();
+
       // Clear readCard arrays.
-      for (int i = 0; i < 7; i++) {
-        readCard[i] = 00;
-      }
-
-      for (int i = 0; i < 4; i++) {
-        smallCard[i] = 00;
-      }
-
-      while (learningMode){
-        // Wait for a card to be scanned.
-        waitForCard();
-        
-        // Check to see if card is a 4 byte UID.
-        itsA4byte = check4Byte();
-
-        // Check if scanned card was master. 
-        masterFound = false;
-        bool cardDefined = false;
-        
-        if (!itsA4byte) {
-          masterFound = checkmaster(readCard);
-        } else {
-          masterFound = checkmaster(smallCard);
-        }
-
-        // If the card was master the leave learning mode.
-        if (masterFound){
-          // Output to show leaving learing mode.
-          #ifdef debug
-            Serial.println(F("-------------------"));
-            Serial.println(F("Master scanned."));
-            Serial.println(F("Exiting learning mode."));
-          #endif 
-
-          #ifdef usingLED
-            // Flash led / beep a set number of times.
-            flashBeep(3, interval, RGBgreenState, RGBgreen);
-            flashBeep(1, interval, RGBblueState, RGBblue);
-          #endif
-
-          learningMode = false;
-
-          // Clear readCard array.
-          cleanup();
-
-          // Reset sleep timer.
-          startMillis = millis();
-
-          return;
-        } else {
-          // Card was not master, is it defined?
-          if (!itsA4byte) {
-            cardDefined = checkcard(readCard);
-          } else {
-            cardDefined = checkcard(smallCard);
-          }
-        }
-
-        // Has the card already been defined.
-        if (!cardDefined) {
-          // Print message to say it will be added to memory.
-          #ifdef debug
-            if (!itsA4byte){
-              Serial.println(F("-------------------"));
-              Serial.println(F("Scanned card had a UID of."));
-              PrintHex8(readCard, 7);
-              Serial.println("");
-              Serial.println(F("It will be added to memory."));
-            } else {
-              Serial.println(F("-------------------"));
-              Serial.println(F("Scanned card had a UID of."));
-              PrintHex8(smallCard, 4);
-              Serial.println("");
-              Serial.println(F("It will be added to memory."));
-            }
-          #endif
-
-          // Create a start position.
-          int startPos = masterUIDSizeLocation + masterSize + 1;
-
-          // Find the next place to write the card.
-          for (int i = 0; i < authorisedCards.size(); i++) {
-            card myCard = authorisedCards.get(i);
-            startPos = startPos + myCard.size + 1;
-          }
-
-          if (!itsA4byte){ 
-            // Create a card instance for the scanned card.
-            card currentCard;
-            
-            for (int j = 0; j < 7; j++) {
-              memcpy(currentCard.uid + j, readCard + j, 1);
-            }
-
-            currentCard.size = 7;
-            currentCard.index = cardCount;            
-            
-            // Write uid size in bytes.
-            EEPROM.update(startPos, currentCard.size);
-            startPos++;
-
-            // Write uid of card to eeprom.
-            for (int i = 0; i < 7; i++) {
-              EEPROM.update(startPos + i, readCard[i]);
-            }
-
-            // add the scanned card to the list
-            authorisedCards.add(currentCard);
-
-          } else {
-            // Create a card instance for the scanned card.
-            card currentCard;
-            
-            for (int j = 0; j < 4; j++) {
-              memcpy(currentCard.uid + j, readCard + j, 1);
-            }
-
-            currentCard.size = 4;
-            currentCard.index = cardCount;
-          
-            // Write uid size in bytes.
-            EEPROM.update(startPos, currentCard.size);
-            startPos++;
-
-            // Write uid of card to eeprom.
-            for (int i = 0; i < 4; i++) {
-              EEPROM.update(startPos + i, smallCard[i]);
-            }
-
-            // add the scanned card to the list
-            authorisedCards.add(currentCard);
-          }
-
-          // Update the number of known cards.
-          cardCount++;
-          EEPROM.update(cardCountLocation, cardCount);
-
-          #ifdef usingLED
-            // Flash led / beep a set number of times.
-            flashBeep(3, interval, RGBblueState, RGBblue);
-            flashBeep(1, interval, RGBgreenState, RGBgreen);
-          #endif
-
-          // Gives the user a second to pull the card away.
-          delay(1000);
-
-        }
-        
-        if (cardDefined) {
-          // Print card is defined.
-          #ifdef debug
-            if (!itsA4byte){
-              Serial.println(F("-------------------"));
-              Serial.println(F("Scanned card had a UID of."));
-              PrintHex8(readCard, 7);
-              Serial.println("");
-              Serial.println(F("It will be removed from memory."));
-            } else {
-              Serial.println(F("-------------------"));
-              Serial.println(F("Scanned card had a UID of."));
-              PrintHex8(smallCard, 4);
-              Serial.println("");
-              Serial.println(F("It will be removed from memory."));
-            }
-          #endif
-
-          // Find where in the list the card to be removed is.
-          card currentCard;
-          if (!itsA4byte) {          
-            currentCard = findCardtoRemove(readCard);
-          } else {
-            currentCard = findCardtoRemove(smallCard);
-          }
-
-          // Check to see if the current card is the errorUID (ERROR!!).
-          if (memcmp(currentCard.uid, errorUID, 7) == 0) {
-            #ifdef debug
-              if (!itsA4byte){
-              Serial.println(F("-------------------"));
-              Serial.println(F("Scanned card had a UID of."));
-              PrintHex8(readCard, 7);
-              Serial.println("");
-              Serial.println(F("It was not found."));
-            } else {
-              Serial.println(F("-------------------"));
-              Serial.println(F("Scanned card had a UID of."));
-              PrintHex8(smallCard, 4);
-              Serial.println("");
-              Serial.println(F("It was not found."));
-            }
-            #endif
-            
-            #ifdef usingLED
-              // Flash led / beep a set number of times.
-              flashBeep(1, interval, RGBredState, RGBred);
-              flashBeep(1, interval, RGBblueState, RGBblue);
-              flashBeep(1, interval, RGBredState, RGBred);
-            #endif
-
-            return;            
-          }
-
-          // Remove the card from the linked list.
-          authorisedCards.remove(currentCard.index);
-
-          // Go through the eeprom and remove the blank space.
-          int startPos = masterUIDSizeLocation + masterSize + 1;
-          for (int i = 0; i < authorisedCards.size(); i++) {
-            card myCard = authorisedCards.get(i);
-            EEPROM.update(startPos, myCard.size);
-            startPos++;
-
-            for (int j = 0; j < myCard.size; j++) {
-              EEPROM.update(startPos + j, myCard.uid[j]);
-            }
-
-            startPos = startPos + myCard.size;
-
-          }
-
-          // Update the number of known cards.
-          cardCount--;
-          EEPROM.update(cardCountLocation, cardCount);
-
-          #ifdef usingLED  
-            // Flash led / beep a set number of times.
-            flashBeep(3, interval, RGBblueState, RGBblue);
-            flashBeep(1, interval, RGBredState, RGBred);
-          #endif
-
-          // Gives the user a second to pull the card away.
-          delay(1000);
-        }
-
-        // Reset sleep timer.
-        startMillis = millis();
-
-        // Clear readCard arrays.
+      cleanup();
+    break;
+    case cardIs4ByteAccess:
+    case cardIs7ByteAccess:
+      // If a match is found and the device is not already in an enabled state activate.
+      if (!enabled) {
+        authorised();
         cleanup();
+        state = waitingOnCard;
+      } else {
+        // If a match is found and the device is already in an enabled state shutdown.
+        shutdown();
+        cleanup();
+        state = waitingOnCard;
       }
-    }
-
-  #endif
-
-  // If a match is found and the device is not already in an enabled state activate.
-  if (matchFound && cardRead && !enabled) {
-    authorised();
-    cleanup();
+    break;
+    case noMatch:
+      // If a match is not found unauthorised.
+      unauthorised();
+      cleanup();
+      state = waitingOnCard;
+    break;
+    case goToSleep:
+      sleepNow();
+    break;
   }
 
-  // If a match is found and the device is already in an enabled state shutdown.
-  if (matchFound && cardRead && enabled ) {
-    shutdown();
-    cleanup();
-  }
-
-  // If a match is not found unauthorised.
-  if (!matchFound && cardRead) {
-    unauthorised();
-    cleanup();
-   }
-
+  // Should we sleep yet?
   #ifdef sleep
     // Should we sleep yet?
     currentMillis = millis();
     if(currentMillis >= startMillis + timeToWait) {
-      sleepNow();
+      state = goToSleep;
     }
   #endif
 }
