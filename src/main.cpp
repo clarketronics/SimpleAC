@@ -743,6 +743,9 @@ void onBoot(){
     // Write to EEPROM we defined Master Card.
     EEPROM.update(masterDefinedLocation, 143);
 
+    // Make sure user has moved card.
+    delay(500);
+
   }
 
   // Read the number of cards currently stored, not including master.
