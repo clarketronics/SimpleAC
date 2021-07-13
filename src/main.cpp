@@ -10,14 +10,14 @@
 */
 
 //-------Definitions- Delete the "//" of the modules you are using----------
-//#define debug // Unmark this to enable output printing to the serial monitor.
+#define debug // Unmark this to enable output printing to the serial monitor.
 //#define usingMP3 // Unmark this if using the df mp3player.
 //#define usingRC522 // Unmark this if you are using the RC522 13.56MHz NFC-HF RFID reader.
 #define usingPN532 // Unmark this if you are using the RC522 13.56MHz NFC-HF RFID reader.
 #define usingLED // Unmark this if you want to enable the RGB LED.
 #define usingBuzzer // Unmark this if you want to enable the Buzzer.
 #define usingRelays // Unmark this if you want to enable the Relays.
-#define sleep // Unmark this if you want to enable sleep mode (conserves battery).
+//#define sleep // Unmark this if you want to enable sleep mode (conserves battery).
 
 //-------Global variables and includes-------
 #include <Arduino.h>
@@ -875,8 +875,10 @@ void learning(){
       // Clear readCard array.
       cleanup();
 
-      // Reset sleep timer.
-      startMillis = millis();
+      #ifdef sleep
+        // Reset sleep timer.
+        startMillis = millis();
+      #endif
 
       learning = false;
       state = waitingOnCard;
@@ -1382,7 +1384,10 @@ void loop() {
     case startOfDay:
       onBoot();
       state = waitingOnCard;
-      startMillis = millis();
+      #ifdef sleep
+        // Reset sleep timer.
+        startMillis = millis();
+      #endif
     break;
     case waitingOnCard:
       // Try to read a card.
@@ -1453,8 +1458,10 @@ void loop() {
       // Enter learning mode (this is blocking).
       learning();
 
-      // Reset sleep timer.
-      startMillis = millis();
+      #ifdef sleep
+        // Reset sleep timer.
+        startMillis = millis();
+      #endif
 
       // Clear readCard arrays.
       cleanup();
@@ -1480,7 +1487,9 @@ void loop() {
       state = waitingOnCard;
     break;
     case goToSleep:
-      sleepNow();
+      #ifdef sleep
+        sleepNow();
+      #endif
     break;
   }
 
