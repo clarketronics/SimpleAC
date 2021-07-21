@@ -1077,6 +1077,11 @@ void learning(){
 
 // Setup.
 void setup() {
+  #ifdef debug
+    Serial.begin(115200);   // Initiate a serial communication at 115200 baud.
+    while (!Serial) {}  // Wait for serial to be open.
+  #endif
+
   #ifdef usingLED
     pinMode(RGBred, OUTPUT);   // Declaring red LED as an output.
     digitalWrite(RGBred, LOW); // Setting it to OFF.
@@ -1208,11 +1213,6 @@ void setup() {
 
     myDFPlayer.volume(volume);  //Set volume value. From 0 to 30
     myDFPlayer.play(startupTrack);  // Play the second mp3 file.
-  #endif
-
-  #ifdef debug
-    Serial.begin(115200);   // Initiate a serial communication at 115200 baud.
-    while (!Serial) {}  // Wait for serial to be open.
   #endif
 
   #ifdef usingRC522
