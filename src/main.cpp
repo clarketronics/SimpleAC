@@ -10,7 +10,7 @@
 */
 
 //-------Definitions- Delete the "//" of the modules you are using----------
-#define debug // Unmark this to enable output printing to the serial monitor.
+#define debug // Unmark this to enable output printing to the serial monitor, note this will not continue without a open serial port.
 //#define usingMP3 // Unmark this if using the df mp3player.
 //#define usingRC522 // Unmark this if you are using the RC522 13.56MHz NFC-HF RFID reader.
 #define usingPN532 // Unmark this if you are using the RC522 13.56MHz NFC-HF RFID reader.
@@ -18,16 +18,15 @@
 #define usingBuzzer // Unmark this if you want to enable the Buzzer.
 #define usingRelays // Unmark this if you want to enable the Relays.
 //#define sleep // Unmark this if you want to enable sleep mode (conserves battery).
+//#define state // Unmark this if your using a micro switch to detect the state of the lock.
 
 //-------Global variables and includes-------
 #include <Arduino.h>
 #include <EEPROM.h>
+#include "FlashBeep.h"
+#include "Helpers.h"
 #define unauthScanCountLocation 2
 bool enabled;
-unsigned int authorisedOutputs, unauthorisedOutputs, authorisedStates, unauthorisedStates, interval, state;
-long lockout[] = {60000, 120000, 300000, 900000};
-byte readCard[7] = {00,00,00,00,00,00,00};
-byte smallCard[4] = {00,00,00,00};
 
 // Catch idiots defining both reader.
 #if defined(usingRC522) && defined(usingPN532) 
@@ -65,41 +64,6 @@ byte smallCard[4] = {00,00,00,00};
   SoftwareSerial mySoftwareSerial(8, 7); // Create SoftwareSerial instance (RX pin, TX pin).
   DFRobotDFPlayerMini myDFPlayer;
   void printDetail(uint8_t type, int value);
-  
-#endif
-
-//-------RGB LED config-------
-#ifdef usingLED
-  // These are user defined variables.
-  const int RGBinterval = 200; // Length of time any LED will flash (milliseconds).
-  int authorisedBlinks = 3; // Number of times to blink if correct UID is scanned.
-  int unauthorisedBlinks = 3; // Number of times to blink if incorrect UID is scanned.
-
-  // These are needed to function, no touching.
-  #define RGBgreen A1 // Rgb green.
-  #define RGBblue A2 // Rgb blue.
-  #define RGBred A3 // Rgb Red.
-
-  int RGBgreenState = LOW; // State used to set the green LED.
-  int RGBblueState = LOW; // State used to set the blue LED.
-  int RGBredState = LOW; // State used to set the red LED.
-
-  unsigned long RGBpreviousMillis = 0;        // will store last time LED was updated.
-#endif
-
-//-------Buzzer config-------
-#ifdef usingBuzzer
-  // These are user defined variables.
-  const int Buzzerinterval = 200; // Length of time the buzzer will buzz (milliseconds).
-  int authorisedBuzzes = 3; // Number of times to buzz if correct UID is scanned.
-  int unauthorisedBuzzes = 3; // Number of times to buzz if incorrect UID is scanned.
-
-  // These are needed to function, no touching.
-  #define Buzzer 4 // Onboard buzzer.
-
-  int BuzzerState = LOW;
-
-  unsigned long BuzzerpreviousMillis = 0;        // will store last time buzzer was updated.
 #endif
 
 //-------Relay config-------
@@ -133,13 +97,8 @@ byte smallCard[4] = {00,00,00,00};
 #define noMatch 60
 
 //-------Programmable uid config-------            
-#include <linkedlist.h>
+#include <LinkedList.h>
 #define clearButton A0 // The pin to monitor on start up to enter clear mode.
-int cardCount, masterSize;
-bool clearEeprom, eepromRead;
-bool itsA4byte = false;
-byte masterCard[7] = {00,00,00,00,00,00,00};
-byte errorUID[7] = {0x45, 0x52, 0x52, 0x4f, 0x52, 0x21, 0x21};
 
 #define masterDefinedLocation 0
 #define cardCountLocation 1
@@ -153,11 +112,6 @@ class card {
 };
 
 LinkedList<card> authorisedCards = LinkedList<card>();
-
-// Read a UID byte from the eeprom.
-byte readUIDbit(int startPosition, int index) {       
-  return EEPROM.read(startPosition + index);
-}
 
 // Find the card to remove from list
 card findCardtoRemove(byte readCard[]){
@@ -175,14 +129,6 @@ card findCardtoRemove(byte readCard[]){
     }
   }
   return errorCard;
-}
-
-// Check read card against master uid
-bool checkmaster(byte readCard[]){
-    if (memcmp(masterCard, readCard, masterSize) == 0){
-      return true;
-    }
-  return false;
 }
 
 //-------Sleep config-------
@@ -231,121 +177,6 @@ bool checkmaster(byte readCard[]){
   
 #endif
 
-// If the uid is 4bytes followed by 3bytes of 00 remove them.
-bool check4Byte() {
-  int byteCount = 0;
-  for (int i = 0; i < 7; i++) {
-    if (readCard[i] != 00) {
-      byteCount++;
-    }
-  }
-
-  if (byteCount > 4){
-    return false;
-  } else {
-    for (int i = 0; i < 4; i++) {
-      memcpy(smallCard + i, readCard + i, 1);
-    }
-    return true;
-  }
-}
-
-// Flash led / beep x number of times.
-void flashBeep(unsigned int states, unsigned int interval, int LEDstate, int  LED) {
-  // Flash led / beep set number of times.
-    #ifdef usingLED
-      bool incrementLED = false; // bool to check if we should increment the state counter.
-    #endif
-
-    #ifdef usingBuzzer
-      bool incrementBuzz = false; // bool to check if we should increment the state counter.
-    #endif
-
-    unsigned long RGBpreviousMillis, BuzzerpreviousMillis;
-
-    for (unsigned int i = 0; i <= states;) {
-      unsigned long currentMillis = millis(); // The current uptime.
-
-      #ifdef usingLED
-        if ((unsigned long)currentMillis - RGBpreviousMillis >= interval) {
-          // save the last time you blinked the LED
-          RGBpreviousMillis = currentMillis;
-
-          // if the LED is off turn it on and vice-versa:
-          if (LEDstate == LOW) {
-            LEDstate = HIGH;
-          } else {
-            LEDstate = LOW;
-          }
-
-          // Set the increment flag.
-          incrementLED = true;
-        }
-        
-        // Set the LED.
-        digitalWrite(LED, LEDstate);
-      #endif
-
-      #ifdef usingBuzzer
-        if ((unsigned long)currentMillis - BuzzerpreviousMillis >= interval) {
-          // save the last time you buzzed the buzzer.
-          BuzzerpreviousMillis = currentMillis;
-
-          // if the buzzer is off turn it on and vice-versa:
-          if (BuzzerState == LOW) {
-            BuzzerState = HIGH;
-          } else {
-            BuzzerState = LOW;
-          }
-
-          // Set the increment flag.
-          incrementBuzz = true;
-        }
-
-        // Set the buzzer.
-        digitalWrite(Buzzer, BuzzerState);
-      #endif
-
-      #if defined(usingLED) && defined(usingBuzzer)
-        // Check wheather we need to increment the state counter.
-        if (incrementLED == true && incrementBuzz == true) {
-          i++; // Increment state counter.
-          incrementLED = false; // Reset the increment flag.
-          incrementBuzz = false; // Reset the increment flag.
-        }
-      #endif
-
-      #ifndef usingBuzzer
-        if (incrementLED == true) {
-            i++; // Increment state counter.
-            incrementLED = false; // Reset the increment flag.
-        }
-      #endif
-
-      #ifndef usingLED
-        if (incrementBuzz == true) {
-            i++; // Increment state counter.
-            incrementBuzz = false; // Reset the increment flag.
-        }
-      #endif
-    }
-
-    // After loop make sure led and buzzer are off.
-    #ifdef usingLED
-      if (LEDstate == HIGH) {
-        LEDstate = LOW;
-      }
-      digitalWrite(LED, LEDstate);
-    #endif
-
-    #ifdef usingBuzzer
-      if (BuzzerState == HIGH) {
-        BuzzerState = LOW;
-      }
-      digitalWrite(Buzzer, BuzzerState);
-    #endif
-}
-
 // Print hex messages with leading 0's
 void PrintHex8(uint8_t *data, uint8_t length) { 
   for (int i=0; i<length; i++) { 
@@ -353,6 +184,142 @@ void PrintHex8(uint8_t *data, uint8_t length) {
     Serial.print(data[i],HEX); 
     Serial.print(" "); 
   }
+}
+
+// Create instance of custom libraries.
+FlashBeep feedback;
+Helpers helpers;
+
+// Setup.
+void setup() {
+
+  // feedback to used (Buzzer enable, LED enable).
+  #if defined(usingBuzzer) && defined(usingLED)
+    feedback.begin(true, true);
+  #endif
+
+  // feedback to used (Buzzer disabled, LED enable).
+  #if !defined(usingBuzzer) && defined(usingLED)
+    feedback.begin(false, true);
+  #endif
+
+  // feedback to used (Buzzer enabled, LED disabled).
+  #if defined(usingBuzzer) && !defined(usingLED)
+    feedback.begin(true, false);
+  #endif
+
+  // Initiate a serial communication for debug.
+  #ifdef debug
+    Serial.begin(115200);   // Initiate a serial communication at 115200 baud.
+    while (!Serial) {}  // Wait for serial to be open.
+  #endif
+
+  #ifdef usingRelays
+    pinMode(relay1, OUTPUT);   // Declaring relay 1 as an output.
+    digitalWrite(relay1, LOW); // Setting it to OFF.
+    pinMode(relay2, OUTPUT);   //Declaring relay 2 as output.
+    digitalWrite(relay2, LOW); // Setting it to OFF.
+  #endif
+
+  #ifdef usingMP3
+    mySoftwareSerial.begin(9600); // Start SoftwareSerial at 9600 baud.
+
+    // Check the device is connected, error if not.
+    if (!myDFPlayer.begin(mySoftwareSerial)) { 
+      // Error state outputs (debug messages).
+      #ifdef debug
+        Serial.println(F("Unable to begin:"));
+        Serial.println(F("1.Please recheck the connection!"));
+        Serial.println(F("2.Please insert the SD card!"));
+      #endif
+
+      // Flash the red LED and beep 2 times.
+      feedback.flashBeep(SHORT_PERIOD, 2, RGBred);
+
+      // Halt.
+      while(true){}
+    }
+
+    #ifdef debug
+      Serial.println(F("mp3Player ready."));
+    #endif
+
+    myDFPlayer.volume(volume);  //Set volume value. From 0 to 30
+    myDFPlayer.play(startupTrack);  // Play the second mp3 file.
+  #endif
+  
+  #ifdef usingRC522
+    SPI.begin();  // Initiate  SPI bus.
+    delay(2000); // Wait for the SPI to come up.
+    mfrc522.PCD_Init(); // Initiate MFRC522
+    mfrc522.PCD_SetAntennaGain(mfrc522.RxGain_max); // Set antenna gain to max (longest range).
+    byte v = mfrc522.PCD_ReadRegister(mfrc522.VersionReg); // Get the software version.
+
+    if ((v == 0x00) || (v == 0xFF)) {
+      #ifdef debug
+        Serial.println(F("WARNING: Communication failure, is the MFRC522 properly connected?"));
+        Serial.println(F("SYSTEM HALTED: Check connections."));
+      #endif
+
+      // Flash the red LED and beep 3 times.
+      feedback.flashBeep(SHORT_PERIOD, 3, RGBred, RGBredState);
+
+      // Halt.
+      while (true);
+    }
+
+    // Reader is ready.
+    #ifdef debug
+      Serial.println(F("Reader is ready."));
+    #endif
+  #endif
+
+  #ifdef usingPN532
+    pn532.begin();
+    uint32_t versiondata = pn532.getFirmwareVersion();
+
+    // Check the device is connected, error if not.
+    if (!versiondata) {
+      // Error state outputs (debug messages).
+      #ifdef debug
+        Serial.print("Didn't find PN53x board");
+      #endif
+
+      // Flash the red LED and beep 3 times.
+      feedback.flashBeep(SHORT_PERIOD, 3, RGBred);
+
+      // Halt.
+      while(true);
+    }
+
+    // Got ok data, print it out!
+    #ifdef debug
+      Serial.print("Found chip PN5"); Serial.println((versiondata>>24) & 0xFF, HEX); 
+      Serial.print("Firmware ver. "); Serial.print((versiondata>>16) & 0xFF, DEC); 
+      Serial.print('.'); Serial.println((versiondata>>8) & 0xFF, DEC);
+    #endif
+
+    /* Set the max number of retry attempts to read from a card
+       This prevents us from waiting forever for a card, which is
+       the default behaviour of the PN532. */
+    pn532.setPassiveActivationRetries(0xFF);
+
+    // configure board to read RFID tags
+    pn532.SAMConfig();
+
+    // Reader is ready.
+    #ifdef debug
+      Serial.println(F("Reader is ready."));
+    #endif      
+  #endif
+
+  // Setup the clear button for clearing eeprom.
+  pinMode(clearButton, INPUT);
+  digitalWrite(clearButton, HIGH);
+
+  #ifdef sleep
+    pinMode(touchPin, INPUT);
+  #endif
 }
 
 // If UID is correct do this.
@@ -365,13 +332,12 @@ void authorised() {
     Serial.println(F("Access authorised."));
   #endif
 
-  // Flash led / beep a set number of times.
-  #ifdef usingLED
-  flashBeep(authorisedStates, interval, RGBgreenState, RGBgreen);
-  #endif
+  // Flash green led and beep a 3 times.
+  feedback.flashBeep(SHORT_PERIOD, 3, RGBgreen);
+
 
   // Play the track assigned when a authorised card / implant is scanned.
-  #if defined (usingmp3player)
+  #ifdef usingmp3player
     myDFPlayer.play(authorisedTrack);
   #endif
 
@@ -430,11 +396,11 @@ void unauthorised() {
     Serial.println(F("Access not authorised."));
   #endif
 
-  // Flash led / beep a set number of times.
-  flashBeep(unauthorisedStates, interval, RGBredState, RGBred);
+  // Flash red led and beep a 3 times.
+  feedback.flashBeep(SHORT_PERIOD, 3, RGBred);
 
   // Play the track assigned when a unauthorised card / implant is scanned.
-  #if defined (usingmp3player)
+  #ifdef usingmp3player
     myDFPlayer.play(unauthorisedTrack);
   #endif
 
@@ -473,11 +439,11 @@ void shutdown() {
     Serial.println(F("Access authorised, shutting down."));
   #endif
 
-  // Flash led / beep a set number of times.
-  flashBeep(authorisedStates, interval, RGBgreenState, RGBgreen);
+  // Flash green led and beep a 3 times.
+  feedback.flashBeep(SHORT_PERIOD, 3, RGBgreen);
 
   // Play the track assigned when a authorised card / implant is scanned.
-  #if defined (usingmp3player)
+  #ifdef usingmp3player
     myDFPlayer.play(shutdownTrack);
   #endif
 
@@ -590,14 +556,14 @@ bool monitorClearButton(uint32_t interval) {
           return false;
       }
     }
-    return true;
-  }
+  return true;
+}
 
 // If programming button pulled low during boot then do this.
 void cleanSlate() {
 
-  // Flash led / beep a set number of times.
-  flashBeep(5, interval, RGBblueState, RGBblue);
+  // Flash blue led and beep a 3 times.
+  feedback.flashBeep(SHORT_PERIOD, 3, RGBblue);
 
   // Print a serial message (if enabled).
   #ifdef debug
@@ -638,10 +604,11 @@ void cleanSlate() {
       Serial.println(F("This will be remove all records and cannot be undone"));
     #endif
 
-    // Flash led / beep a set number of times.
-    flashBeep(1, interval, RGBredState, RGBred);      
-    flashBeep(1, interval, RGBgreenState, RGBgreen);
-    flashBeep(1, interval, RGBredState, RGBred);
+    // Flash red, green, red led and beep a 3 times.
+    feedback.flashBeep(SHORT_PERIOD, 1, RGBred);
+    feedback.flashBeep(SHORT_PERIOD, 1, RGBgreen);
+    feedback.flashBeep(SHORT_PERIOD, 1, RGBred);
+
 
     bool buttonState = monitorClearButton(10000); // Wait for the button to be pressed for 10 seconds.
 
@@ -704,15 +671,15 @@ void onBoot(){
       Serial.println(F("-------------------"));
     #endif
 
-    // Flash led / beep a set number of times.
-    flashBeep(3, interval, RGBredState, RGBred);
-    flashBeep(1, interval, RGBgreenState, RGBgreen);
+    // Flash red led twice and green onece, beep a 3 times.
+    feedback.flashBeep(SHORT_PERIOD, 2, RGBred);
+    feedback.flashBeep(SHORT_PERIOD, 1, RGBgreen);
 
     // Wait until we scan a card befor continuing.
     waitForCard();
 
     // Check to see if 4 or 7 byte uid.
-    itsA4byte = check4Byte();
+    itsA4byte = helpers.check4Byte(readCard, smallCard);
 
     // Write the scanned card to the eeprom as the master card.
     if (!itsA4byte) {
@@ -755,7 +722,7 @@ void onBoot(){
   masterSize = EEPROM.read(masterUIDSizeLocation);
 
   for (int i = 0; i < masterSize; i++) {
-    byte recievedByte = readUIDbit(masterUIDSizeLocation + 1, i);
+    byte recievedByte = helpers.readUIDbit(masterUIDSizeLocation + 1, i);
     memcpy(masterCard + i, &recievedByte, 1);
   }
 
@@ -777,7 +744,7 @@ void onBoot(){
       startPos++;
       // Reads each card UID from eeprom byte by byte.
       for (int j = 0; j < size; j++) {
-        byte recievedByte = readUIDbit(startPos, j);
+        byte recievedByte = helpers.readUIDbit(startPos, j);
         memcpy(buffer + j, &recievedByte, 1);
       }
 
@@ -825,9 +792,9 @@ void onBoot(){
       Serial.println(F("Scan master card to add access cards"));
     #endif
 
-    // Flash led / beep a set number of times.
-    flashBeep(3, interval, RGBredState, RGBred);
-    flashBeep(1, interval, RGBblueState, RGBblue);
+    // Flash red, red, blue and buzz with each flash.
+    feedback.flashBeep(SHORT_PERIOD, 2, RGBred);
+    feedback.flashBeep(SHORT_PERIOD, 1, RGBblue);
   }
 
   // Clear readCard arrays.
@@ -854,7 +821,7 @@ void learning(){
     bool masterFound = false;
     bool cardDefined = false;
     
-    if (!check4Byte()) {
+    if (!helpers.check4Byte(readCard, smallCard)) {
       masterFound = checkmaster(readCard);
     } else {
       masterFound = checkmaster(smallCard);
@@ -869,11 +836,9 @@ void learning(){
         Serial.println(F("Exiting learning mode."));
       #endif 
 
-      #ifdef usingLED
-        // Flash led / beep a set number of times.
-        flashBeep(3, interval, RGBgreenState, RGBgreen);
-        flashBeep(1, interval, RGBblueState, RGBblue);
-      #endif
+      // Flash the red LED and beep 3 times.
+      feedback.flashBeep(SHORT_PERIOD, 2, RGBgreen);
+      feedback.flashBeep(SHORT_PERIOD, 1, RGBblue);
 
       // Clear readCard array.
       cleanup();
@@ -886,10 +851,12 @@ void learning(){
       learning = false;
       state = waitingOnCard;
 
+      delay(1000);
+
       return;
     } else {
       // Card was not master, is it defined?
-      if (!check4Byte()) {
+      if (!helpers.check4Byte(readCard, smallCard)) {
         cardDefined = checkCard(readCard);
       } else {
         cardDefined = checkCard(smallCard);
@@ -899,7 +866,7 @@ void learning(){
       if (!cardDefined) {
         // Print message to say it will be added to memory.
         #ifdef debug
-          if (!check4Byte()){
+          if (!helpers.check4Byte(readCard, smallCard)){
             Serial.println(F("-------------------"));
             Serial.println(F("Scanned card had a UID of."));
             PrintHex8(readCard, 7);
@@ -923,7 +890,7 @@ void learning(){
           startPos = startPos + myCard.size + 1;
         }
 
-        if (!check4Byte()){ 
+        if (!helpers.check4Byte(readCard, smallCard)){ 
           // Create a card instance for the scanned card.
           card currentCard;
           
@@ -974,11 +941,9 @@ void learning(){
         cardCount++;
         EEPROM.update(cardCountLocation, cardCount);
 
-        #ifdef usingLED
-          // Flash led / beep a set number of times.
-          flashBeep(3, interval, RGBblueState, RGBblue);
-          flashBeep(1, interval, RGBgreenState, RGBgreen);
-        #endif
+        // Flash blue twice and red once, beep all 3 times.
+        feedback.flashBeep(SHORT_PERIOD, 2, RGBblue);
+        feedback.flashBeep(SHORT_PERIOD, 1, RGBgreen);
 
         // Gives the user a second to pull the card away.
         delay(1000);
@@ -989,7 +954,7 @@ void learning(){
       if (cardDefined) {
         // Print card is defined.
         #ifdef debug
-          if (!check4Byte()){
+          if (!helpers.check4Byte(readCard, smallCard)){
             Serial.println(F("-------------------"));
             Serial.println(F("Scanned card had a UID of."));
             PrintHex8(readCard, 7);
@@ -1006,7 +971,7 @@ void learning(){
 
         // Find where in the list the card to be removed is.
         card currentCard;
-        if (!check4Byte()) {          
+        if (!helpers.check4Byte(readCard, smallCard)) {          
           currentCard = findCardtoRemove(readCard);
         } else {
           currentCard = findCardtoRemove(smallCard);
@@ -1015,7 +980,7 @@ void learning(){
         // Check to see if the current card is the errorUID (ERROR!!).
         if (memcmp(currentCard.uid, errorUID, 7) == 0) {
           #ifdef debug
-            if (!check4Byte()){
+            if (!helpers.check4Byte(readCard, smallCard)){
             Serial.println(F("-------------------"));
             Serial.println(F("Scanned card had a UID of."));
             PrintHex8(readCard, 7);
@@ -1029,14 +994,12 @@ void learning(){
             Serial.println(F("It was not found."));
           }
           #endif
-          
-          #ifdef usingLED
-            // Flash led / beep a set number of times.
-            flashBeep(1, interval, RGBredState, RGBred);
-            flashBeep(1, interval, RGBblueState, RGBblue);
-            flashBeep(1, interval, RGBredState, RGBred);
-          #endif
 
+          // Flash red, blue then red, beep each time.
+          feedback.flashBeep(SHORT_PERIOD, 1, RGBred);
+          feedback.flashBeep(SHORT_PERIOD, 1, RGBblue);
+          feedback.flashBeep(SHORT_PERIOD, 1, RGBred);
+          
           return;            
         }
 
@@ -1062,322 +1025,15 @@ void learning(){
         cardCount--;
         EEPROM.update(cardCountLocation, cardCount);
 
-        #ifdef usingLED  
-          // Flash led / beep a set number of times.
-          flashBeep(3, interval, RGBblueState, RGBblue);
-          flashBeep(1, interval, RGBredState, RGBred);
-        #endif
+        // Flash blue twice red once, beep each time.
+        feedback.flashBeep(SHORT_PERIOD, 2, RGBblue);
+        feedback.flashBeep(SHORT_PERIOD, 2, RGBred);
 
         // Gives the user a second to pull the card away.
         delay(1000);
       }
     }
   }
-}
-
-// Setup.
-void setup() {
-  #ifdef usingLED
-    pinMode(RGBred, OUTPUT);   // Declaring red LED as an output.
-    digitalWrite(RGBred, LOW); // Setting it to OFF.
-    pinMode(RGBgreen, OUTPUT);   // Declaring green LED as an output.
-    digitalWrite(RGBgreen, LOW); // Setting it to OFF.
-    pinMode(RGBblue, OUTPUT);   // Declaring blue LED as an output.
-    digitalWrite(RGBblue, LOW); // Setting it to OFF.
-
-    // Quick little flash 
-    digitalWrite(RGBgreen, HIGH); // Activates green led.
-    delay(500); // Waits 0.5 seconds.
-    digitalWrite(RGBgreen, LOW); // Deactivates green led.
-    delay(100); // Waits 0.1 seconds.
-    digitalWrite(RGBblue, HIGH); // Activates blue led.
-    delay(500); // Waits 0.5 seconds.
-    digitalWrite(RGBblue, LOW); // Deactivates blue led.
-    delay(100); // Waits 0.1 seconds.
-    digitalWrite(RGBred, HIGH); // Activates red led.
-    delay(500); // Waits 0.5 seconds.
-    digitalWrite(RGBred, LOW); // Deactivates red led.
-
-    // If the buzzer isnt being used.
-    #ifndef usingBuzzer
-      // Set the number of flashes and beeps to blinks.
-      authorisedOutputs = authorisedBlinks;
-      unauthorisedOutputs = unauthorisedBlinks;
-
-      // Set the number of state changes required to output x times and turn back off.
-      if ((authorisedOutputs % 2) == 0) {
-        authorisedStates = authorisedOutputs + 1;
-      } else {
-        authorisedStates = authorisedOutputs + 2;
-      }
-
-      if ((unauthorisedOutputs % 2) == 0) {
-        unauthorisedStates = unauthorisedOutputs + 1;
-      } else {
-        unauthorisedStates = unauthorisedOutputs + 2;
-      }
-
-      // Set the interval to blink interval.
-      interval = RGBinterval;
-
-    #endif
-  #endif
-
-  #ifdef usingBuzzer
-    pinMode(Buzzer, OUTPUT);   // Declaring buzzer as an output.
-    digitalWrite(Buzzer, LOW); // Setting it to OFF.
-
-    // Quick little beep.
-    digitalWrite(Buzzer, HIGH); // Activates the buzzer.
-    delay(200); // Delay 0.2 seconds.
-    digitalWrite(Buzzer, LOW); // Deactivates the buzzer.
-
-    // If the LED isnt being used.
-    #ifndef usingLED
-      // Set the number of flashes and beeps to blinks.
-      authorisedOutputs = authorisedBuzzes;
-      unauthorisedOutputs = unauthorisedBuzzes;
-
-      // Set the number of state changes required to output x times and turn back off.
-      if ((authorisedOutputs % 2) == 0) {
-        authorisedStates = authorisedOutputs + 1;
-      } else {
-        authorisedStates = authorisedOutputs + 2;
-      }
-
-      if ((unauthorisedOutputs % 2) == 0) {
-        unauthorisedStates = unauthorisedOutputs + 1;
-      } else {
-        unauthorisedStates = unauthorisedOutputs + 2;
-      }
-
-      // Set the interval to blink interval.
-      interval = Buzzerinterval;
-
-    #endif
-  #endif
-
-  #ifdef usingRelays
-    pinMode(relay1, OUTPUT);   // Declaring relay 1 as an output.
-    digitalWrite(relay1, LOW); // Setting it to OFF.
-    pinMode(relay2, OUTPUT);   //Declaring relay 2 as output.
-    digitalWrite(relay2, LOW); // Setting it to OFF.
-  #endif
-
-  #ifdef usingMP3
-    mySoftwareSerial.begin(9600); // Start SoftwareSerial at 9600 baud.
-
-    // Check the device is connected, error if not.
-    if (!myDFPlayer.begin(mySoftwareSerial)) { 
-      // Error state outputs (debug messages).
-      #ifdef debug
-        Serial.println(F("Unable to begin:"));
-        Serial.println(F("1.Please recheck the connection!"));
-        Serial.println(F("2.Please insert the SD card!"));
-      #endif
-
-      // Error state outputs (buzzer beep).
-      #ifdef usingBuzzer
-        digitalWrite(Buzzer, HIGH); // Activates the buzzer.
-        delay(200); // Delay 0.2 seconds.
-        digitalWrite(Buzzer, LOW); // Deactivates the buzzer.
-        delay(200); // Delay 0.2 seconds.
-        digitalWrite(Buzzer, HIGH); // Activates the buzzer.
-        delay(200); // Delay 0.2 seconds.
-        digitalWrite(Buzzer, LOW); // Deactivates the buzzer.
-      #endif
-      
-      // Error state outputs (Red led flash).
-      #ifdef usingLED
-        digitalWrite(RGBred, HIGH); // Activates the red LED.
-        delay(200); // Delay 0.2 seconds.
-        digitalWrite(RGBred, LOW); // Deactivates the red LED.
-        delay(200); // Delay 0.2 seconds.
-        digitalWrite(RGBred, HIGH); // Activates the red LED.
-        delay(200); // Delay 0.2 seconds.
-        digitalWrite(RGBred, LOW); // Deactivates the red LED.
-      #endif
-
-      // Halt.
-      while(true){}
-    }
-
-    #ifdef debug
-      Serial.println(F("mp3Player ready."));
-    #endif
-
-    myDFPlayer.volume(volume);  //Set volume value. From 0 to 30
-    myDFPlayer.play(startupTrack);  // Play the second mp3 file.
-  #endif
-
-  #ifdef debug
-    Serial.begin(115200);   // Initiate a serial communication at 115200 baud.
-    while (!Serial) {}  // Wait for serial to be open.
-  #endif
-
-  #ifdef usingRC522
-    SPI.begin();  // Initiate  SPI bus.
-    delay(2000); // Wait for the SPI to come up.
-    mfrc522.PCD_Init(); // Initiate MFRC522
-    mfrc522.PCD_SetAntennaGain(mfrc522.RxGain_max); // Set antenna gain to max (longest range).
-    byte v = mfrc522.PCD_ReadRegister(mfrc522.VersionReg); // Get the software version.
-
-    if ((v == 0x00) || (v == 0xFF)) {
-      #ifdef debug
-        Serial.println(F("WARNING: Communication failure, is the MFRC522 properly connected?"));
-        Serial.println(F("SYSTEM HALTED: Check connections."));
-      #endif
-
-      // Error state outputs (buzzer beep).
-      #ifdef usingBuzzer
-        digitalWrite(Buzzer, HIGH); // Activates the buzzer.
-        delay(200); // Delay 0.2 seconds.
-        digitalWrite(Buzzer, LOW); // Deactivates the buzzer.
-        delay(200); // Delay 0.2 seconds.
-        digitalWrite(Buzzer, HIGH); // Activates the buzzer.
-        delay(200); // Delay 0.2 seconds.
-        digitalWrite(Buzzer, LOW); // Deactivates the buzzer.
-        delay(200); // Delay 0.2 seconds.
-        digitalWrite(Buzzer, HIGH); // Activates the buzzer.
-        delay(200); // Delay 0.2 seconds.
-        digitalWrite(Buzzer, LOW); // Deactivates the buzzer.
-      #endif
-      
-      // Error state outputs (Red led flash).
-      #ifdef usingLED
-        digitalWrite(RGBred, HIGH); // Activates the red LED.
-        delay(200); // Delay 0.2 seconds.
-        digitalWrite(RGBred, LOW); // Deactivates the red LED.
-        delay(200); // Delay 0.2 seconds.
-        digitalWrite(RGBred, HIGH); // Activates the red LED.
-        delay(200); // Delay 0.2 seconds.
-        digitalWrite(RGBred, LOW); // Deactivates the red LED.
-        delay(200); // Delay 0.2 seconds.
-        digitalWrite(RGBred, HIGH); // Activates the red LED.
-        delay(200); // Delay 0.2 seconds.
-        digitalWrite(RGBred, LOW); // Deactivates the red LED.
-      #endif
-
-      // Halt.
-      while (true);
-    }
-
-    // Reader is ready.
-    #ifdef debug
-      Serial.println(F("Reader is ready."));
-    #endif
-  #endif
-
-  #ifdef usingPN532
-    pn532.begin();
-    uint32_t versiondata = pn532.getFirmwareVersion();
-
-    // Check the device is connected, error if not.
-    if (!versiondata) {
-      // Error state outputs (debug messages).
-      #ifdef debug
-        Serial.print("Didn't find PN53x board");
-      #endif
-
-      // Error state outputs (buzzer beep).
-      #ifdef usingBuzzer
-        digitalWrite(Buzzer, HIGH); // Activates the buzzer.
-        delay(200); // Delay 0.2 seconds.
-        digitalWrite(Buzzer, LOW); // Deactivates the buzzer.
-        delay(200); // Delay 0.2 seconds.
-        digitalWrite(Buzzer, HIGH); // Activates the buzzer.
-        delay(200); // Delay 0.2 seconds.
-        digitalWrite(Buzzer, LOW); // Deactivates the buzzer.
-        delay(200); // Delay 0.2 seconds.
-        digitalWrite(Buzzer, HIGH); // Activates the buzzer.
-        delay(200); // Delay 0.2 seconds.
-        digitalWrite(Buzzer, LOW); // Deactivates the buzzer.
-      #endif
-      
-      // Error state outputs (Red led flash).
-      #ifdef usingLED
-        digitalWrite(RGBred, HIGH); // Activates the red LED.
-        delay(200); // Delay 0.2 seconds.
-        digitalWrite(RGBred, LOW); // Deactivates the red LED.
-        delay(200); // Delay 0.2 seconds.
-        digitalWrite(RGBred, HIGH); // Activates the red LED.
-        delay(200); // Delay 0.2 seconds.
-        digitalWrite(RGBred, LOW); // Deactivates the red LED.
-        delay(200); // Delay 0.2 seconds.
-        digitalWrite(RGBred, HIGH); // Activates the red LED.
-        delay(200); // Delay 0.2 seconds.
-        digitalWrite(RGBred, LOW); // Deactivates the red LED.
-      #endif
-
-      // Halt.
-      while(true);
-    }
-
-    // Got ok data, print it out!
-    #ifdef debug
-      Serial.print("Found chip PN5"); Serial.println((versiondata>>24) & 0xFF, HEX); 
-      Serial.print("Firmware ver. "); Serial.print((versiondata>>16) & 0xFF, DEC); 
-      Serial.print('.'); Serial.println((versiondata>>8) & 0xFF, DEC);
-    #endif
-
-    /* Set the max number of retry attempts to read from a card
-       This prevents us from waiting forever for a card, which is
-       the default behaviour of the PN532. */
-    pn532.setPassiveActivationRetries(0xFF);
-
-    // configure board to read RFID tags
-    pn532.SAMConfig();
-
-    // Reader is ready.
-    #ifdef debug
-      Serial.println(F("Reader is ready."));
-    #endif      
-  #endif
-
-  // Setup the clear button for clearing eeprom.
-  pinMode(clearButton, INPUT);
-  digitalWrite(clearButton, HIGH);
-
-  #if defined(usingLED) && defined(usingBuzzer)
-    // Set the number of flashes and beeps to the greater of the 2 inputs.
-    if (authorisedBlinks >= authorisedBuzzes) {
-      authorisedOutputs = authorisedBlinks;
-    } else {
-      authorisedOutputs = authorisedBuzzes;
-    }
-
-    if (unauthorisedBlinks >= unauthorisedBuzzes) {
-      unauthorisedOutputs = unauthorisedBlinks;
-    } else {
-      unauthorisedOutputs = unauthorisedBuzzes;
-    }
-
-    // Set the number of state changes required to output x times and turn back off.
-    if ((authorisedOutputs % 2) == 0) {
-      authorisedStates = authorisedOutputs + 1;
-    } else {
-      authorisedStates = authorisedOutputs + 2;
-    }
-
-    if ((unauthorisedOutputs % 2) == 0) {
-      unauthorisedStates = unauthorisedOutputs + 1;
-    } else {
-      unauthorisedStates = unauthorisedOutputs + 2;
-    }
-
-
-    // Set the interval to which ever is greater.
-    if (RGBinterval >= Buzzerinterval) {
-      interval = RGBinterval;
-    } else {
-      interval = Buzzerinterval;
-    }
-
-  #endif
-
-  #ifdef sleep
-    pinMode(touchPin, INPUT);
-  #endif
 }
 
 // Main loop.
@@ -1414,7 +1070,7 @@ void loop() {
     break;
     case cardReadSuccessfully:
       // Check to see if card is 4 byte or not.
-      if (check4Byte()) {
+      if (helpers.check4Byte(readCard, smallCard)) {
         state = cardIs4Byte;
       } else {
         state = cardIs7Byte;
@@ -1449,11 +1105,9 @@ void loop() {
         Serial.println(F("Scan access card to ADD or REMOVE."));
       #endif 
 
-      #ifdef usingLED
-        // Flash led / beep a set number of times.
-        flashBeep(3, interval, RGBgreenState, RGBgreen);
-        flashBeep(1, interval, RGBblueState, RGBblue);
-      #endif
+      // Flash green twice then blue, beep each time.
+      feedback.flashBeep(SHORT_PERIOD, 2, RGBgreen);
+      feedback.flashBeep(SHORT_PERIOD, 1, RGBblue);
 
       // Clear read card arrays.
       cleanup();
