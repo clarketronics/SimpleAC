@@ -29,6 +29,9 @@ class FlashBeep {
         unsigned long RGBpreviousMillis = 0; // will store last time LED was updated.
 
         void begin(bool BUZZ, bool LED);
+        void output(unsigned int PERIOD, int FLABEEPS, int LED);
+
+    private:
         int beep(unsigned int PERIOD, int STATES);
         int flash(unsigned int PERIOD, int STATES, int LED);
         int flashBeep(unsigned int PERIOD, int STATES, int LED);

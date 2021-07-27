@@ -1,7 +1,7 @@
 #include "FlashBeep.h"
 
 // Constructor ran when class is instantiated.
-void FlashBeep::begin(bool BUZZER, bool LED){
+void FlashBeep::begin(bool BUZZER, bool LED) {
     // Setup LED if defined.
     if (LED) {
         // Set to make sure we know LED is enabled.
@@ -50,7 +50,7 @@ void FlashBeep::begin(bool BUZZER, bool LED){
 }
 
 // Just a set of beeps.
-int FlashBeep::beep(unsigned int PERIOD, int BEEPS){
+int FlashBeep::beep(unsigned int PERIOD, int BEEPS) {
     // State variable.
     int STATES = 0;
 
@@ -96,7 +96,7 @@ int FlashBeep::beep(unsigned int PERIOD, int BEEPS){
 }
 
 // Just a set of flashes.
-int FlashBeep::flash(unsigned int PERIOD, int FLASHES, int LED){
+int FlashBeep::flash(unsigned int PERIOD, int FLASHES, int LED) {
     // State variable.
     int STATES = 0;
     int LEDSTATE = LOW;
@@ -143,7 +143,7 @@ int FlashBeep::flash(unsigned int PERIOD, int FLASHES, int LED){
 }
 
 // Flash and beep (every state has both a flash and beep).
-int FlashBeep::flashBeep(unsigned int PERIOD, int FLABEEPS, int LED){
+int FlashBeep::flashBeep(unsigned int PERIOD, int FLABEEPS, int LED) {
      // Method variables.
     int STATES = 0;
     int LEDSTATE = LOW;
@@ -201,4 +201,21 @@ int FlashBeep::flashBeep(unsigned int PERIOD, int FLABEEPS, int LED){
 
     // Return 0 (good);
     return 0;
+}
+
+// Handler for class, this takes all the pain out of flashbeep.
+void FlashBeep::output(unsigned int PERIOD, int OUTPUTS, int LED = 0) {
+    if (BUZZ && RGB) {
+        if (LED != 0) {
+            flashBeep(PERIOD, OUTPUTS, LED);
+        }
+    }
+
+    if (!BUZZ && RGB) {
+        flash(PERIOD, OUTPUTS, LED);
+    }
+
+    if (BUZZ && !RGB) {
+        beep(PERIOD, OUTPUTS);
+    }
 }
