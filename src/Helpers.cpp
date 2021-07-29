@@ -1,7 +1,7 @@
 #include "Helpers.h"
 
 // Reader class constructor, sets up readers for use.
-Reader::Reader(FlashBeep &feedback){
+Reader::Reader(FlashBeep &feedback, NFCReader &nfcReader){
   #ifdef using_RC522
     SPI.begin();  // Initiate  SPI bus.
     delay(2000); // Wait for the SPI to come up.
@@ -69,7 +69,7 @@ Reader::Reader(FlashBeep &feedback){
 }
 
 // Read a card ad return a bool.
-bool Reader::Read(Data &data){
+bool Reader::Read(Data &data, NFCReader &nfcReader){
   #ifdef using_PN532
     bool success;
     uint8_t uid[] = { 0, 0, 0, 0, 0, 0, 0 };  // Buffer to store the returned UID
@@ -207,9 +207,9 @@ void Helpers::cleanup(Data &data){
 }
 
 // Blocks until a card is present at the reader.
-void Helpers::waitForCard(Data &data, Reader &reader){ 
+void Helpers::waitForCard(Data &data, Reader &reader, NFCReader &nfcReader){ 
     bool cardRead = false;
     while (!cardRead) {
-      reader.Read(data);
+      reader.Read(data, nfcReader);
     }
 }
