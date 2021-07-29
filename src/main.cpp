@@ -19,6 +19,11 @@
 #define unauthScanCountLocation 2
 bool enabled = false;
 
+// Create instance of custom libraries.
+FlashBeep feedback;
+Helpers helpers;
+Data data;
+
 // Catch idiots defining both reader.
 #if defined(using_RC522) && defined(using_PN532) 
 #error "You can't define both readers at the same time!."
@@ -79,6 +84,13 @@ bool enabled = false;
 #define cardCountLocation 1
 #define masterUIDSizeLocation 3
 
+#if defined(using_PN532)
+    PN532_SPI pn532spi(SPI, 10); // Create an SPI instance of the PN532, (Interface, SS pin).
+    NFCReader nfcReader(pn532spi); // Create the readers class for addressing it directly.
+#elif defined(using_RC522)        
+    NFCReader nfcReader(10, 9);   // Create MFRC522 instance, (SS pin, RST pin).
+#endif
+
 //-------Sleep config-------
 #ifdef sleep
   // These are user defined variables.
@@ -112,7 +124,7 @@ bool enabled = false;
 
     sleep_disable(); // First thing that is done is to disable the sleep mode.
 
-    state = waitingOnCard;
+    data.state = waitingOnCard;
 
     #ifdef using_RC522
       nfcReader.PCD_SoftPowerUp(); // Turn the reader back on.
@@ -125,21 +137,13 @@ bool enabled = false;
   
 #endif
 
-#if defined(using_PN532)
-    PN532_SPI pn532spi(SPI, 10); // Create an SPI instance of the PN532, (Interface, SS pin).
-    NFCReader nfcReader(pn532spi); // Create the readers class for addressing it directly.
-#elif defined(using_RC522)        
-    NFCReader nfcReader(10, 9);   // Create MFRC522 instance, (SS pin, RST pin).
-#endif
-
-// Create instance of custom libraries.
-FlashBeep feedback;
-Helpers helpers;
-Reader reader(feedback, nfcReader);
-Data data;
 
 // Setup.
 void setup() {
+
+  // Setup the reader for use.
+  helpers.setupReader(feedback, nfcReader);
+
   // feedback to used (Buzzer enable, LED enable).
   #if defined(usingBuzzer) && defined(usingLED)
     feedback.begin(true, true);
@@ -392,7 +396,8 @@ void cleanSlate() {
   #endif
 
   // Wait until we scan a card befor continuing.
-  helpers.waitForCard(data, reader, nfcReader);
+  while (!helpers.readCard(data, nfcReader)){}
+  
 
   // Read Master Card's UID from EEPROM
   for ( int i = 0; i < data.masterSize; i++ ) {          
@@ -473,7 +478,7 @@ void onBoot(){
     feedback.output(SHORT_PERIOD, 1, RGBgreen);
 
     // Wait until we scan a card befor continuing.
-    helpers.waitForCard(data, reader, nfcReader);
+    while (!helpers.readCard(data, nfcReader)){}
 
     // Check to see if 4 or 7 byte uid.
     data.itsA4byte = helpers.check4Byte(data);
@@ -605,7 +610,7 @@ void learning(){
   while (learning){
 
     // Wait for a card to be scanned.
-    helpers.waitForCard(data, reader, nfcReader);
+    while (!helpers.readCard(data, nfcReader)){}
     
     // Check if scanned card was master. 
     bool masterFound = false;
@@ -847,7 +852,7 @@ void loop() {
     break;
     case waitingOnCard:
       // Try to read a card.
-      if (reader.Read(data, nfcReader)) {
+      if (helpers.readCard(data, nfcReader)) {
         data.state = cardReadSuccessfully;
       } else {
         data.state = waitingOnCard;

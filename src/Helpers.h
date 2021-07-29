@@ -20,13 +20,6 @@
     typedef MFRC522 NFCReader;
 #endif
 
-class Reader {
-    public:
-        Reader(FlashBeep &feedback, NFCReader &nfcReader);
-        bool Read(Data &data, NFCReader &nfcReader);             
-};
-
-
 class Helpers {
     public:
         bool check4Byte(Data &data);
@@ -36,6 +29,7 @@ class Helpers {
         card findCardtoRemove(byte readCard[], Data &data);
         bool checkCard(int size, Data &data);
         void cleanup(Data &data);
-        void waitForCard(Data &data, Reader &reader, NFCReader &nfcReader);
+        bool readCard(Data &data, NFCReader &nfcReader);
+        void setupReader(FlashBeep &feedback, NFCReader &nfcReader);
 };
 

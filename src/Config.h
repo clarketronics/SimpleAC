@@ -6,5 +6,5 @@
 #define usingLED // Unmark this if you want to enable the RGB LED.
 #define usingBuzzer // Unmark this if you want to enable the Buzzer.
 #define usingRelays // Unmark this if you want to enable the Relays.
-//#define sleep // Unmark this if you want to enable sleep mode (conserves battery).
+#define sleep // Unmark this if you want to enable sleep mode (conserves battery).
 //#define input // Unmark this if your using a micro switch (or similar) to detect the state of the lock.
