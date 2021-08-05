@@ -68,7 +68,7 @@ void Helpers::setupReader(FlashBeep &feedback, NFCReader &nfcReader){
   #endif
 }
 
-// Read a card ad return a bool.
+// Read a card and return a bool.
 bool Helpers::readCard(Data &data, NFCReader &nfcReader){
   #ifdef using_PN532
     bool success;
@@ -170,7 +170,7 @@ card Helpers::findCardtoRemove(byte Card[], Data &data){
 // Check read card against authorised uid's
 bool Helpers::checkCard(int size, Data &data){
 
-  if (size == Byte4) {
+  if (size == fourByte) {
     for (int i = 0; i < data.authorisedCards.size(); i++){
       card curentCard = data.authorisedCards.get(i);
       if (memcmp(curentCard.uid, data.smallCard, 4) == 0){
@@ -178,7 +178,7 @@ bool Helpers::checkCard(int size, Data &data){
       }
     }
     return false;
-  } else if (size == Byte7) {
+  } else if (size == sevenByte) {
     for (int i = 0; i < data.authorisedCards.size(); i++){
       card curentCard = data.authorisedCards.get(i);
       if (memcmp(curentCard.uid, data.readCard, 7) == 0){
@@ -203,5 +203,248 @@ void Helpers::cleanup(Data &data){
     }
 
     data.itsA4byte = false;
+}
 
+// Clear button held during boot
+bool Helpers::monitorClearButton(uint32_t interval) {
+    uint32_t now = (uint32_t)millis();
+    while ((uint32_t)millis() - now < interval)  {
+      // check on every half a second
+      if (((uint32_t)millis() % 500) == 0) {
+        if (digitalRead(clearButton) != HIGH)
+          return false;
+      }
+    }
+  return true;
+}
+
+// If programming button pulled low during boot then do this.
+void Helpers::cleanSlate(Data &data, NFCReader &nfcReader, FlashBeep &feedback) {
+
+  // Flash blue led and beep a 3 times.
+  feedback.output(SHORT_PERIOD, 3, RGBblue);
+
+  // Print a serial message (if enabled).
+  #ifdef debug
+    Serial.println(F("-------------------"));
+    Serial.println(F("Clear mode!"));
+    Serial.println(F("Please release the clear button / ground connection. Once released we can continue."));
+  #endif
+
+  // Wait until the programming button / pin goes high.
+  while (digitalRead(clearButton) == LOW) {}
+
+  // Print serial message (if enabled).
+  #ifdef debug
+    Serial.println(F("-------------------"));
+    Serial.println(F("Scan master card to clear all cards"));
+    Serial.println(F("Reset to resume normal opperation"));
+  #endif
+
+  // Wait until we scan a card befor continuing.
+  while (!readCard(data, nfcReader)){}
+  
+
+  // Read Master Card's UID from EEPROM
+  for ( int i = 0; i < data.masterSize; i++ ) {          
+    data.masterCard[i] = EEPROM.read(masterUIDSizeLocation + 1 + i);
+  }
+
+  #ifdef debug
+    printHex8(data.masterCard, data.masterSize); // Print each character of the mastercard UID.
+    Serial.println("");
+  #endif
+
+  // See if scanned card is the master.
+  if (checkmaster(data.readCard, data)) {
+    #ifdef debug
+      Serial.println(F("-------------------"));
+      Serial.println(F("This is your last chance"));
+      Serial.println(F("You have 10 seconds to Cancel"));
+      Serial.println(F("This will be remove all records and cannot be undone"));
+    #endif
+
+    // Flash red, green, red led and beep a 3 times.
+    feedback.output(SHORT_PERIOD, 1, RGBred);
+    feedback.output(SHORT_PERIOD, 1, RGBgreen);
+    feedback.output(SHORT_PERIOD, 1, RGBred);
+
+
+    bool buttonState = monitorClearButton(10000); // Wait for the button to be pressed for 10 seconds.
+
+    // If button still be pressed, wipe EEPROM
+    if (buttonState && digitalRead(clearButton) == HIGH) {      
+      // Loop through eeprom and remove everything.
+      for (unsigned int i = 0 ; i < EEPROM.length() ; i++) {
+        EEPROM.update(i, 0);
+      }
+
+      #ifdef debug
+        Serial.println(F("-------------------"));
+        Serial.println(F("All data erased from device"));
+        Serial.println(F("Please reset to re-program Master Card"));
+      #endif
+
+      // turn the green LED on when we're done
+      digitalWrite(RGBgreen, HIGH);
+
+      // Halt.
+      while (1);
+    }
+    #ifdef debug
+      Serial.println(F("-------------------"));
+      Serial.println(F("Master Card Erase Cancelled"));
+      Serial.println(F("Reset to resume normal opperation"));
+    #endif
+
+
+    // Halt, user needs to power cycle.
+    while (1);
+  }    
+}
+
+// Read all values from eeprom at start of day.
+void Helpers::onBoot(Data &data, NFCReader &nfcReader, FlashBeep &feedback){
+  // Check to see if we are entering clearing mode.
+  if (digitalRead(clearButton) == LOW) {
+    cleanSlate(data, nfcReader, feedback);
+  }
+
+  // Check if master is defined, halt if not.
+  if (EEPROM.read(masterDefinedLocation) != 143) {
+    #ifdef debug
+      Serial.println(F("-------------------"));
+      Serial.println(F("No master card defined."));
+      Serial.println(F("Please scan a master card.")); 
+      Serial.println(F("-------------------"));
+    #endif
+
+    // Flash red led twice and green onece, beep a 3 times.
+    feedback.output(SHORT_PERIOD, 2, RGBred);
+    feedback.output(SHORT_PERIOD, 1, RGBgreen);
+
+    // Wait until we scan a card befor continuing.
+    while (!readCard(data, nfcReader)){}
+
+    // Check to see if 4 or 7 byte uid.
+    data.itsA4byte = check4Byte(data);
+
+    // Write the scanned card to the eeprom as the master card.
+    if (!data.itsA4byte) {
+      EEPROM.update(masterUIDSizeLocation, 7);
+      data.masterSize = 7;
+      for (unsigned int i = 0; i < 7; i++ ) {        
+        EEPROM.update(masterUIDSizeLocation + 1 + i, data.readCard[i]);  // Write scanned PICC's UID to EEPROM, start from address 3
+      }
+    } else {
+      data.masterSize = 4;
+      EEPROM.update(masterUIDSizeLocation, 4);
+      for (unsigned int i = 0; i < 4; i++ ) {        
+        EEPROM.update(masterUIDSizeLocation + 1 + i, data.smallCard[i]);  // Write scanned PICC's UID to EEPROM, start from address 3
+      }
+    }
+
+    // Print the mastercard UID.
+    #ifdef debug
+      if (!data.itsA4byte) {
+        printHex8(data.readCard, 7); 
+        Serial.println("");
+      } else {
+        printHex8(data.smallCard, 4); 
+        Serial.println("");
+      }
+    #endif
+
+    // Write to EEPROM we defined Master Card.
+    EEPROM.update(masterDefinedLocation, 143);
+
+    // Clear data.readCard arrays.
+    cleanup(data);
+
+    // Make sure user has moved card.
+    delay(500);
+
+  }
+
+  // Read the number of cards currently stored, not including master.
+  data.cardCount = EEPROM.read(cardCountLocation);
+
+  // Read the master card and place in memory.
+  data.masterSize = EEPROM.read(masterUIDSizeLocation);
+
+  for (int i = 0; i < data.masterSize; i++) {
+    byte recievedByte = readUIDbit(masterUIDSizeLocation + 1, i);
+    memcpy(data.masterCard + i, &recievedByte, 1);
+  }
+
+  // Read access cards and place in memory.
+  if (data.cardCount != 0) {
+    // Itterate through the number of cards.
+    int startPos = masterUIDSizeLocation + data.masterSize + 1;
+    
+    for (int i = 0; i < data.cardCount; i++) {
+      // Read cards size.
+      int size = EEPROM.read(startPos);
+
+      // initialise a array of the cards size.
+      byte buffer[size];
+      for (int i = 0; i < size; i++) {
+        buffer[i] = 00;
+      }
+
+      startPos++;
+      // Reads each card UID from eeprom byte by byte.
+      for (int j = 0; j < size; j++) {
+        byte recievedByte = readUIDbit(startPos, j);
+        memcpy(buffer + j, &recievedByte, 1);
+      }
+
+      // Creates a card and sets UID and its index (place in list).
+      card currentCard;
+      
+      for (int j = 0; j < size; j++) {
+        memcpy(currentCard.uid + j, buffer + j, 1);
+      }
+
+      currentCard.index = i;
+      currentCard.size = size;
+
+      // Adds the card the the linked list (where it is referenced from during run time).
+      data.authorisedCards.add(currentCard);
+
+      startPos = startPos + size;
+
+      // Print out card details.
+      #ifdef debug
+        Serial.println(F("-------------------"));
+        Serial.print(F("Card number: "));
+        Serial.println(currentCard.index);
+        Serial.print(F("Card size in bytes: "));
+        Serial.println(currentCard.size);
+        Serial.print(F("Card uid: "));
+        printHex8(currentCard.uid, currentCard.size);
+        Serial.println(F(""));
+      #endif
+    }
+    // Output to show number of access cards defined.
+    #ifdef debug
+      Serial.println(F("-------------------"));          
+      Serial.print(F("There are "));
+      Serial.print(data.cardCount);
+      Serial.print(F(" access cards defined."));
+      Serial.println("");
+    #endif        
+
+  } else {
+    // Output to show no access cards defined.
+    #ifdef debug
+      Serial.println(F("-------------------"));
+      Serial.println(F("No access cards defined."));
+      Serial.println(F("Scan master card to add access cards"));
+    #endif
+
+    // Flash red, red, blue and buzz with each flash.
+    feedback.output(SHORT_PERIOD, 2, RGBred);
+    feedback.output(SHORT_PERIOD, 1, RGBblue);
+  }
 }

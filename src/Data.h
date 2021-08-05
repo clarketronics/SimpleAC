@@ -18,6 +18,7 @@ class Data {
         byte smallCard[4] = {00,00,00,00};
         int cardCount, masterSize, state;
         bool itsA4byte;
+        unsigned long currentMillis, startMillis; // To keep track of time and time since wake.
 
         LinkedList<card> authorisedCards = LinkedList<card>();
         

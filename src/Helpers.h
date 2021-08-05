@@ -9,11 +9,37 @@
 #include "PN532.h"
 #include <MFRC522.h>
 
+//------Card size config------
+enum cardSize{
+    fourByte,
+    sevenByte
+};
 
+//------State machine config------
+enum states{    
+    startOfDay,
+    waitingOnCard,
+    cardReadSuccessfully,
+    cardIs4Byte,
+    cardIs7Byte,
+    cardIs4ByteMaster,
+    cardIs4ByteAccess,
+    cardIs7ByteMaster,
+    cardIs7ByteAccess,
+    goToSleep,
+    noMatch
+};
 
-#define Byte4 1
-#define Byte7 2
+//------EEPROM locations------
+#define unauthScanCountLocation 2
+#define masterDefinedLocation 0
+#define masterUIDSizeLocation 3
+#define cardCountLocation 1
 
+//------Clear button------
+#define clearButton A0
+
+//------Reader wrapper------
 #if defined(using_PN532)
     typedef PN532 NFCReader;
 #elif defined(using_RC522)        
@@ -31,5 +57,10 @@ class Helpers {
         void cleanup(Data &data);
         bool readCard(Data &data, NFCReader &nfcReader);
         void setupReader(FlashBeep &feedback, NFCReader &nfcReader);
+        void onBoot(Data &data, NFCReader &nfcReader, FlashBeep &feedback);
+
+    private:
+        void cleanSlate(Data &data, NFCReader &nfcReader, FlashBeep &feedback);
+        bool monitorClearButton(uint32_t interval);
 };
 
