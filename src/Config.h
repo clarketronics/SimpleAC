@@ -5,7 +5,7 @@
 #define using_PN532 // Unmark this if you are using the RC522 13.56MHz NFC-HF RFID reader.
 #define using_LED // Unmark this if you want to enable the RGB LED.
 #define using_Buzzer // Unmark this if you want to enable the Buzzer.
-//#define Sleep // Unmark this if you want to enable sleep mode (conserves battery).
+#define Sleep // Unmark this if you want to enable sleep mode (conserves battery).
 
 
 // Don't touch anything below, or do im not your mum.

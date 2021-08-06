@@ -1,6 +1,9 @@
 # SimpleAC
 A product and idea by Chimpo McDoodle.
 
+## Important Notes:
+This code is is designed to run 3.3v it will in its unedited state brick a 5v pro micro, to prevent this change `board = sparkfun_promicro8` to `board = sparkfun_promicro16` in the platformio.ini file.
+
 ## Required libraries:
 **[LinkedList](https://github.com/ivanseidel/LinkedList)**: This is used for managing card UID's.    
 **[DFRobotDFPlayerMini](https://github.com/DFRobot/DFRobotDFPlayerMini)**: This is for the MP3 player module.    
@@ -62,4 +65,4 @@ Within the SimpleAC there are several flash / beep codes, some are specific to s
 | GBG | |
 | GGR | |
 | GGB | Learning mode (Master scanned) entered or exited |
-| GGG | Authorised, Authorised shut down |
+| GGG | Authorised |

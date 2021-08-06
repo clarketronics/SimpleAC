@@ -24,6 +24,9 @@ void authorised(Data &data, FlashBeep &feedback) {
     // Trigger relay one or two.
     switch (State){
         case Locked:
+            // Flash green led and beep a 3 times.
+            feedback.output(SHORT_PERIOD, 3, RGBgreen);
+
             digitalWrite(relay1, HIGH); // Turn on relay 1.
 
             #ifdef debug
@@ -40,6 +43,9 @@ void authorised(Data &data, FlashBeep &feedback) {
 
         break;
         case Unlocked:
+            // Flash green led and beep a 3 times.
+            feedback.output(SHORT_PERIOD, 3, RGBgreen);
+            
             digitalWrite(relay2, HIGH); // Turn on relay 2.
 
             #ifdef debug
