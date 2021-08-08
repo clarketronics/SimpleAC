@@ -81,21 +81,32 @@ void setup() {
   pinMode(relay1, OUTPUT); // Declaring relay 1 as an output.
   digitalWrite(relay1, LOW); // Setting it to OFF.
   pinMode(relay2, OUTPUT); //Declaring relay 2 as output.
-  digitalWrite(relay2, LOW); // Setting it to OFF.
+  digitalWrite(relay2, LOW); // Setting it to OFF.  
 
-  // Setup state input pin.
-  pinMode(statePin, INPUT_PULLUP); // Declare state pin as an input.
-
-  // Setup the clear button for clearing eeprom.
-  pinMode(clearButton, INPUT_PULLUP); // Declaring clear button as an input.
-
-  #ifdef Sleep
-    if (defaultStateTO == HIGH){
+  // Set state of input pins (input or input with pullup enabled)
+  if (defaultState == HIGH){
+    #ifdef Sleep
       pinMode(wakeupPin, INPUT_PULLUP);
-    } else {
+    #endif
+
+    #ifdef car
+      pinMode(statePin, INPUT_PULLUP); // Declare state pin as an input.
+    #endif
+
+    pinMode(clearButton, INPUT_PULLUP); // Declaring clear button as an input.
+  } else {
+    #ifdef Sleep
       pinMode(wakeupPin, INPUT);
-    }
-  #endif
+    #endif
+
+    #ifdef car
+      pinMode(statePin, INPUT); // Declare state pin as an input.
+    #endif
+    
+    pinMode(clearButton, INPUT); // Declaring clear button as an input.
+    
+  }
+  
 }
 
 // Main loop.

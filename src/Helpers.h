@@ -15,21 +15,6 @@ enum cardSize{
     sevenByte
 };
 
-//------State machine config------
-enum states{    
-    startOfDay,
-    waitingOnCard,
-    cardReadSuccessfully,
-    cardIs4Byte,
-    cardIs7Byte,
-    cardIs4ByteMaster,
-    cardIs4ByteAccess,
-    cardIs7ByteMaster,
-    cardIs7ByteAccess,
-    goToSleep,
-    noMatch
-};
-
 //------EEPROM locations------
 #define unauthScanCountLocation 2
 #define masterDefinedLocation 0

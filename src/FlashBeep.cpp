@@ -68,7 +68,7 @@ int FlashBeep::beep(unsigned int PERIOD, int BEEPS) {
         return 1;
     }
 
-    startTime = millis();
+    startMillis = millis();
 
     for(int i = 0; i < STATES;) {
         if ((unsigned long)millis() - BuzzerpreviousMillis >= PERIOD) {
@@ -115,7 +115,7 @@ int FlashBeep::flash(unsigned int PERIOD, int FLASHES, int LED) {
         return 1;
     }
 
-    startTime = millis();
+    startMillis = millis();
 
     for(int i = 0; i < STATES;) {
         if ((unsigned long)millis() - RGBpreviousMillis >= PERIOD) {
@@ -168,7 +168,7 @@ int FlashBeep::flashBeep(unsigned int PERIOD, int FLABEEPS, int LED) {
         return 1;
     }
 
-    startTime = millis();
+    startMillis = millis();
 
     for(int i = 0; i < STATES;) {
         if ((unsigned long)millis() - previousMillis >= PERIOD) {

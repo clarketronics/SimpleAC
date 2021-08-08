@@ -13,7 +13,7 @@ const int RGBred = A3; // Rgb Red.
 class FlashBeep {
     public:
         // Time variables.
-        unsigned long startTime, previousMillis;
+        unsigned long startMillis, previousMillis;
 
         // Buzzer related variables and const.
         bool BUZZ = false;
