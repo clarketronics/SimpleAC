@@ -1,5 +1,5 @@
 # SimpleAC
-A product and idea by Chimpo McDoodle.
+A product and idea by Chimpo McDoodle, supported by a community of biohackers and crazy's around the world.
 
 ## Important Notes:
 This code is is designed to run 3.3v it will in its unedited state brick a 5v pro micro, to prevent this change `board = sparkfun_promicro8` to `board = sparkfun_promicro16` in the platformio.ini file.
