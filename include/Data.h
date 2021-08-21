@@ -3,7 +3,7 @@
 #include <LinkedList.h>
 
 //------Card config (for linked list)------
-class card {
+struct card {
   public:
     byte uid[7];
     int size;
