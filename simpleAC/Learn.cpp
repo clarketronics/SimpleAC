@@ -2,7 +2,7 @@
 
 // Learning mode (add and remove cards).
 void learn(Data &data, NFCReader &nfcReader, FlashBeep &feedback, Helpers &helpers){
-  // Delay to allow card to be removed.
+  // Delay to allow master card to be removed.
   delay(1000);
 
   // Bool used to track whether we need to exit learning mode or not.
