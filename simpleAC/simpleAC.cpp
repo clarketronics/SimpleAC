@@ -1,4 +1,12 @@
-/* NOTES: 
+/* 
+Required libraries:
+LinkedList https://github.com/ivanseidel/LinkedList This is used for managing card UID's.    
+DFRobotDFPlayerMini https://github.com/DFRobot/DFRobotDFPlayerMini This is for the MP3 player module.    
+MFRC522 https://github.com/miguelbalboa/rfid This is for the RC522 reader module.    
+PN532 https://github.com/clarketronics/PN532 This is for the PN532 reader module (includes power saving).    
+SoftwareSerial This is required by the DFRobot library above and is part of the default install.    
+
+NOTES: 
   * If LED's and Buzzer are enabled the authorised and unautorised blinks / buzzes 
     will be which ever value is greater.
 
