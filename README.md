@@ -1,5 +1,8 @@
 # SimpleAC
-A product and idea by Chimpo McDoodle.
+A product and idea by Chimpo McDoodle, supported by a community of biohackers and crazy's around the world.
+
+## Important Notes:
+This code is is designed to run 3.3v it will in its unedited state brick a 5v pro micro (if using platformio), to prevent this change `board = sparkfun_promicro8` to `board = sparkfun_promicro16` in the platformio.ini file.
 
 ## Important Notes:
 This code is is designed to run 3.3v it will in its unedited state brick a 5v pro micro, to prevent this change `board = sparkfun_promicro8` to `board = sparkfun_promicro16` in the platformio.ini file.
@@ -15,14 +18,14 @@ This code is is designed to run 3.3v it will in its unedited state brick a 5v pr
 The code below contains all the options on how you can set up your simpleAC. Removing the // befor a line to let the code know your using that part.
 
 ```c++
-#define debug // Unmark this to enable output printing to the serial monitor.
-//#define usingMP3 // Unmark this if using the df mp3player.
-#define usingRC522 // Unmark this if you are using the RC522 13.56MHz NFC-HF RFID reader.
-//#define usingPN532 // Unmark this if you are using the RC522 13.56MHz NFC-HF RFID reader.
-//#define hardcodeUID // Unmark this if you want to hard code your UID's.
-#define usingLED // Unmark this if you want to enable the RGB LED.
-#define usingBuzzer // Unmark this if you want to enable the Buzzer.
-#define usingRelays // Unmark this if you want to enable the Relays.
+//-------Module Definitions- Delete the "//" of the modules you are using----------
+//#define debug // Unmark this to enable output printing to the serial monitor, this will not continue without a open serial port.
+//#define using_MP3 // Unmark this if using the df mp3player.
+//#define using_RC522 // Unmark this if you are using the RC522 13.56MHz NFC-HF RFID reader.
+#define using_PN532 // Unmark this if you are using the PN532 13.56MHz NFC-HF RFID reader.
+#define using_LED // Unmark this if you want to enable the RGB LED.
+#define using_Buzzer // Unmark this if you want to enable the Buzzer.
+#define Sleep // Unmark this if you want to enable sleep mode (conserves battery).
 ```
 
 ## Flash codes:
@@ -43,12 +46,12 @@ Within the SimpleAC there are several flash / beep codes, some are specific to s
 | RRB | No access cards defined |
 | RRG | No master defined, scan new master now |
 | RBR | Card to remove was not found |
-| RBB | |
+| RBB | Unlocking failed (car mode) |
 | RBG | |
 | RGR | Master scanned (clear mode), starts 10 second countdown |
 | RGB | |
 | RGG | |
-| BRR | |
+| BRR | Locking failed (car mode) |
 | BRB | |
 | BRG | |
 | BBR | Learning mode, Card removed |
@@ -61,8 +64,8 @@ Within the SimpleAC there are several flash / beep codes, some are specific to s
 | GRB | |
 | GRG | |
 | GBR | Boot up sequence |
-| GBB | |
-| GBG | |
+| GBB | Authorised, locking (car mode)|
+| GBG | Authorised, unlocking (car mode)|
 | GGR | |
 | GGB | Learning mode (Master scanned) entered or exited |
-| GGG | Authorised, Authorised shut down |
+| GGG | Authorised (accessory mode) |
