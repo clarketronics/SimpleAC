@@ -440,11 +440,13 @@ void Helpers::onBoot(Data &data, NFCReader &nfcReader, FlashBeep &feedback){
     #ifdef debug
       Serial.println(F("-------------------"));
       Serial.println(F("No access cards defined."));
-      Serial.println(F("Scan master card to add access cards"));
     #endif
 
     // Flash red, red, blue and buzz with each flash.
     feedback.output(SHORT_PERIOD, 2, RGBred);
     feedback.output(SHORT_PERIOD, 1, RGBblue);
+
+    // Enter learning mode because master was just set.
+    data.state = cardIsMaster;
   }
 }

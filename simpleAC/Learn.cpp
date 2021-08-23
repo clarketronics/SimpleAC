@@ -42,8 +42,8 @@ void learn(Data &data, NFCReader &nfcReader, FlashBeep &feedback, Helpers &helpe
       // Clear data.readCard array.
       helpers.cleanup(data);
 
-      #ifdef sleep
-        // Reset sleep timer.
+      // Reset sleep timer.
+      #ifdef sleep        
         data.startMillis = millis();
       #endif
 

@@ -17,9 +17,8 @@ enum states{
     cardReadSuccessfully,
     cardIs4Byte,
     cardIs7Byte,
-    cardIs4ByteMaster,
+    cardIsMaster,
     cardIs4ByteAccess,
-    cardIs7ByteMaster,
     cardIs7ByteAccess,
     goToSleep,
     noMatch

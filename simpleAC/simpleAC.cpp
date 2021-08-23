@@ -78,7 +78,7 @@ void setup() {
   // Initiate a serial communication for debug.
   #ifdef debug
     Serial.begin(115200); // Initiate a serial communication at 115200 baud.
-    while (!Serial) {} // Wait for serial to be open.
+    while (!Serial || millis < 5000) {} // Wait for serial to be open or 5 seconds.
   #endif
 
   #ifdef using_MP3
@@ -148,7 +148,7 @@ void loop() {
     case cardIs4Byte:
       // Check whether the card read is master or even known.
       if (helpers.checkmaster(data.smallCard, data)) {
-        data.state = cardIs4ByteMaster;
+        data.state = cardIsMaster;
       } else if (helpers.checkCard(fourByte, data)) {
         data.state = cardIs4ByteAccess;
       } else {
@@ -158,15 +158,14 @@ void loop() {
     case cardIs7Byte:
       // Check whether the card read is master or even known.
       if (helpers.checkmaster(data.readCard, data)) {
-        data.state = cardIs7ByteMaster;
+        data.state = cardIsMaster;
       } else if (helpers.checkCard(sevenByte, data)) {
         data.state = cardIs7ByteAccess;
       } else {
         data.state = noMatch;
       }
     break;
-    case cardIs7ByteMaster:
-    case cardIs4ByteMaster:
+    case cardIsMaster:
       // Output to show entered learing mode.
       #ifdef debug
         Serial.println(F("-------------------"));
