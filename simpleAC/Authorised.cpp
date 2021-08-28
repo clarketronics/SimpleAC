@@ -136,7 +136,9 @@
             Serial.println(F("Starting."));
         #endif
 
-        delay(startTime); // Run starter motor for the alloted time.  
+        delay(startTime); // Run starter motor for the alloted time.
+
+        digitalWrite(relay2, LOW); // Turn off relay 2.  
 
         #ifdef Sleep
             data.startMillis = millis(); // Reset timeout counter.

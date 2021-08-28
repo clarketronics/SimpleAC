@@ -31,6 +31,7 @@ enum cardSize{
     typedef MFRC522 NFCReader;
 #endif
 
+
 class Helpers {
     public:
         bool check4Byte(Data &data);
@@ -43,6 +44,7 @@ class Helpers {
         bool readCard(Data &data, NFCReader &nfcReader);
         void setupReader(FlashBeep &feedback, NFCReader &nfcReader);
         void onBoot(Data &data, NFCReader &nfcReader, FlashBeep &feedback);
+        void waitForSerial(unsigned long timeout_millis);
 
     private:
         void cleanSlate(Data &data, NFCReader &nfcReader, FlashBeep &feedback);

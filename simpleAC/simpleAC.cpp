@@ -78,7 +78,7 @@ void setup() {
   // Initiate a serial communication for debug.
   #ifdef debug
     Serial.begin(115200); // Initiate a serial communication at 115200 baud.
-    while (!Serial || millis < 5000) {} // Wait for serial to be open or 5 seconds.
+    helpers.waitForSerial(5000); // Wait for serial to be open or 5 seconds.
   #endif
 
   #ifdef using_MP3

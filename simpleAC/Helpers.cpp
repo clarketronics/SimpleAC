@@ -450,3 +450,11 @@ void Helpers::onBoot(Data &data, NFCReader &nfcReader, FlashBeep &feedback){
     data.state = cardIsMaster;
   }
 }
+
+void Helpers::waitForSerial(unsigned long timeout_millis) {
+  unsigned long start = millis();
+  while (!Serial) {
+    if (millis() - start > timeout_millis)
+      break;
+  }
+}
