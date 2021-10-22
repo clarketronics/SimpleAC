@@ -173,9 +173,16 @@ void loop() {
         Serial.println(F("Scan access card to ADD or REMOVE."));
       #endif 
 
-      // Flash green twice then blue, beep each time.
-      feedback.output(SHORT_PERIOD, 2, RGBgreen);
-      feedback.output(SHORT_PERIOD, 1, RGBblue);
+      #if defined(using_Buzzer) && defined(using_LED)
+        // Flash the red LED and beep 3 times.
+        feedback.output(SHORT_PERIOD, 2, RGBgreen);
+        feedback.output(SHORT_PERIOD, 1, RGBblue);
+      #endif
+
+      #if defined(using_Buzzer) && !defined(using_LED)
+          // Beep seven times
+          feedback.output(SHORT_PERIOD, 7);
+      #endif
 
       // Clear read card arrays.
       helpers.cleanup(data);

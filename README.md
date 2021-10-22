@@ -68,4 +68,15 @@ Within the SimpleAC there are several flash / beep codes, some are specific to s
 | GBG | Authorised, unlocking (car mode)|
 | GGR | |
 | GGB | Learning mode (Master scanned) entered or exited |
-| GGG | Authorised (accessory mode) |
+| GGG | Authorised (accessory and bike mode) |
+
+**Note:** These are the codes if the LED is not enabled.
+| Beep Number | Description |
+| :---: | :---: |
+| 1 | Authorised, unlocking (car mode), Learning mode (Card added) |
+| 2 | Authorised, locking (car mode), Learning mode (Card removed) |
+| 3 | Error / Unauthorsed |
+| 4 | Clear mode, Master scanned (clear mode), starts 10 second countdown |
+| 5 | No access cards defined |
+| 6 | No master defined, scan new master now |
+| 7 | Learning mode (Leaving or Entering) |

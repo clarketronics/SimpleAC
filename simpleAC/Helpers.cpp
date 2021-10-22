@@ -221,8 +221,15 @@ bool Helpers::monitorClearButton(uint32_t interval) {
 // If programming button pulled low during boot then do this.
 void Helpers::cleanSlate(Data &data, NFCReader &nfcReader, FlashBeep &feedback) {
 
-  // Flash blue led and beep a 3 times.
-  feedback.output(SHORT_PERIOD, 3, RGBblue);
+  #if defined(using_Buzzer) && defined(using_LED)
+    // Flash blue led and beep a 3 times.
+    feedback.output(SHORT_PERIOD, 3, RGBblue);
+  #endif
+
+  #if defined(using_Buzzer) && !defined(using_LED)
+      // Beep 4 times
+      feedback.output(SHORT_PERIOD, 4);
+  #endif
 
   // Print a serial message (if enabled).
   #ifdef debug
@@ -264,11 +271,17 @@ void Helpers::cleanSlate(Data &data, NFCReader &nfcReader, FlashBeep &feedback) 
       Serial.println(F("This will be remove all records and cannot be undone"));
     #endif
 
-    // Flash red, green, red led and beep a 3 times.
-    feedback.output(SHORT_PERIOD, 1, RGBred);
-    feedback.output(SHORT_PERIOD, 1, RGBgreen);
-    feedback.output(SHORT_PERIOD, 1, RGBred);
+    #if defined(using_Buzzer) && defined(using_LED)
+      // Flash red, green, red led and beep a 3 times.
+      feedback.output(SHORT_PERIOD, 1, RGBred);
+      feedback.output(SHORT_PERIOD, 1, RGBgreen);
+      feedback.output(SHORT_PERIOD, 1, RGBred);
+    #endif
 
+    #if defined(using_Buzzer) && !defined(using_LED)
+      // Beep 4 times
+      feedback.output(SHORT_PERIOD, 4);
+    #endif
 
     bool buttonState = monitorClearButton(10000); // Wait for the button to be pressed for 10 seconds.
 
@@ -287,6 +300,7 @@ void Helpers::cleanSlate(Data &data, NFCReader &nfcReader, FlashBeep &feedback) 
 
       // turn the green LED on when we're done
       digitalWrite(RGBgreen, HIGH);
+      digitalWrite(Buzzer, HIGH);
 
       // Halt.
       while (1);
@@ -319,9 +333,16 @@ void Helpers::onBoot(Data &data, NFCReader &nfcReader, FlashBeep &feedback){
       Serial.println(F("-------------------"));
     #endif
 
-    // Flash red led twice and green onece, beep a 3 times.
-    feedback.output(SHORT_PERIOD, 2, RGBred);
-    feedback.output(SHORT_PERIOD, 1, RGBgreen);
+    #if defined(using_Buzzer) && defined(using_LED)
+      // Flash red led twice and green onece, beep a 3 times.
+      feedback.output(SHORT_PERIOD, 2, RGBred);
+      feedback.output(SHORT_PERIOD, 1, RGBgreen);
+    #endif
+
+    #if defined(using_Buzzer) && !defined(using_LED)
+        // Beep six times
+        feedback.output(SHORT_PERIOD, 6);
+    #endif
 
     // Wait until we scan a card befor continuing.
     while (!readCard(data, nfcReader)){}
@@ -442,9 +463,16 @@ void Helpers::onBoot(Data &data, NFCReader &nfcReader, FlashBeep &feedback){
       Serial.println(F("No access cards defined."));
     #endif
 
-    // Flash red, red, blue and buzz with each flash.
-    feedback.output(SHORT_PERIOD, 2, RGBred);
-    feedback.output(SHORT_PERIOD, 1, RGBblue);
+    #if defined(using_Buzzer) && defined(using_LED)
+      // Flash red, red, blue and buzz with each flash.
+      feedback.output(SHORT_PERIOD, 2, RGBred);
+      feedback.output(SHORT_PERIOD, 1, RGBblue);
+    #endif
+
+    #if defined(using_Buzzer) && !defined(using_LED)
+        // Beep five times
+        feedback.output(SHORT_PERIOD, 5);
+    #endif
 
     // Enter learning mode because master was just set.
     data.state = cardIsMaster;

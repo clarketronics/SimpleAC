@@ -10,6 +10,8 @@ const int RGBgreen = A1; // Rgb green.
 const int RGBblue = A2; // Rgb blue.
 const int RGBred = A3; // Rgb Red.
 
+const int Buzzer = 4; // Onboard buzzer.
+
 class FlashBeep {
     public:
         // Time variables.
@@ -17,8 +19,7 @@ class FlashBeep {
 
         // Buzzer related variables and const.
         bool BUZZ = false;
-        const int Buzzer = 4; // Onboard buzzer.
-
+        
         int BuzzerState = LOW; // State used to set the buzzer.
 
         unsigned long BuzzerpreviousMillis = 0; // will store last time buzzer was updated.
@@ -29,7 +30,7 @@ class FlashBeep {
         unsigned long RGBpreviousMillis = 0; // will store last time LED was updated.
 
         void begin(bool BUZZ, bool LED);
-        void output(unsigned int PERIOD, int FLABEEPS, int LED);
+        void output(unsigned int PERIOD, int FLABEEPS, int LED = 0);
 
     private:
         int beep(unsigned int PERIOD, int STATES);

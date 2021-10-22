@@ -35,9 +35,16 @@ void learn(Data &data, NFCReader &nfcReader, FlashBeep &feedback, Helpers &helpe
         Serial.println(F("Exiting learning mode."));
       #endif 
 
-      // Flash the red LED and beep 3 times.
-      feedback.output(SHORT_PERIOD, 2, RGBgreen);
-      feedback.output(SHORT_PERIOD, 1, RGBblue);
+      #if defined(using_Buzzer) && defined(using_LED)
+        // Flash the red LED and beep 3 times.
+        feedback.output(SHORT_PERIOD, 2, RGBgreen);
+        feedback.output(SHORT_PERIOD, 1, RGBblue);
+      #endif
+
+      #if defined(using_Buzzer) && !defined(using_LED)
+          // Beep seven times
+          feedback.output(SHORT_PERIOD, 7);
+      #endif
 
       // Clear data.readCard array.
       helpers.cleanup(data);
@@ -140,9 +147,16 @@ void learn(Data &data, NFCReader &nfcReader, FlashBeep &feedback, Helpers &helpe
         data.cardCount++;
         EEPROM.update(cardCountLocation, data.cardCount);
 
-        // Flash blue twice and red once, beep all 3 times.
-        feedback.output(SHORT_PERIOD, 2, RGBblue);
-        feedback.output(SHORT_PERIOD, 1, RGBgreen);
+        #if defined(using_Buzzer) && defined(using_LED)
+          // Flash blue twice and red once, beep all 3 times.
+          feedback.output(SHORT_PERIOD, 2, RGBblue);
+          feedback.output(SHORT_PERIOD, 1, RGBgreen);
+        #endif
+
+        #if defined(using_Buzzer) && !defined(using_LED)
+            // Beep one times
+            feedback.output(SHORT_PERIOD, 1);
+        #endif
 
         // Gives the user a second to pull the card away.
         delay(1000);
@@ -194,10 +208,17 @@ void learn(Data &data, NFCReader &nfcReader, FlashBeep &feedback, Helpers &helpe
           }
           #endif
 
-          // Flash red, blue then red, beep each time.
-          feedback.output(SHORT_PERIOD, 1, RGBred);
-          feedback.output(SHORT_PERIOD, 1, RGBblue);
-          feedback.output(SHORT_PERIOD, 1, RGBred);
+          #if defined(using_Buzzer) && defined(using_LED)
+            // Flash red, blue then red, beep each time.
+            feedback.output(SHORT_PERIOD, 1, RGBred);
+            feedback.output(SHORT_PERIOD, 1, RGBblue);
+            feedback.output(SHORT_PERIOD, 1, RGBred);
+          #endif
+
+          #if defined(using_Buzzer) && !defined(using_LED)
+            // Beep three times
+            feedback.output(SHORT_PERIOD, 3);
+          #endif
           
           return;            
         }
@@ -224,9 +245,16 @@ void learn(Data &data, NFCReader &nfcReader, FlashBeep &feedback, Helpers &helpe
         data.cardCount--;
         EEPROM.update(cardCountLocation, data.cardCount);
 
-        // Flash blue twice red once, beep each time.
-        feedback.output(SHORT_PERIOD, 2, RGBblue);
-        feedback.output(SHORT_PERIOD, 1, RGBred);
+        #if defined(using_Buzzer) && defined(using_LED)
+          // Flash blue twice red once, beep each time.
+          feedback.output(SHORT_PERIOD, 2, RGBblue);
+          feedback.output(SHORT_PERIOD, 1, RGBred);
+        #endif
+
+        #if defined(using_Buzzer) && !defined(using_LED)
+          // Beep two times
+          feedback.output(SHORT_PERIOD, 2);
+        #endif
 
         // Gives the user a second to pull the card away.
         delay(1000);

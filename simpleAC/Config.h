@@ -8,9 +8,9 @@
 #define Sleep // Unmark this if you want to enable sleep mode (conserves battery).
 
 //-------Mode Definitions- Delete the "//" of the mode you want to use----------
-//#define car // This mode is designed to lock and unlock a car.
+#define car // This mode is designed to lock and unlock a car.
 //#define bike // This mode is designed to prime and then starts the bike.
-#define accessory // This mode is designed to give a latching output when authorised.
+//#define accessory // This mode is designed to give a latching output when authorised.
 
 
 //------Car mode variables------

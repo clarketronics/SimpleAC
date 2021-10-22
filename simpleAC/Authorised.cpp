@@ -24,10 +24,18 @@
         // Trigger relay one or two.
         switch (State){
             case Locked:
-                // Flash green, blue and green plus beep a 3 times.
-                feedback.output(SHORT_PERIOD, 1, RGBgreen);
-                feedback.output(SHORT_PERIOD, 1, RGBblue);
-                feedback.output(SHORT_PERIOD, 1, RGBgreen);
+
+                #if defined(using_Buzzer) && defined(using_LED)
+                    // Flash green, blue and green plus beep a 3 times.
+                    feedback.output(SHORT_PERIOD, 1, RGBgreen);
+                    feedback.output(SHORT_PERIOD, 1, RGBblue);
+                    feedback.output(SHORT_PERIOD, 1, RGBgreen);
+                #endif
+
+                #if defined(using_Buzzer) && !defined(using_LED)
+                    // Beep once
+                    feedback.output(SHORT_PERIOD, 1);
+                #endif
 
                 digitalWrite(relay1, HIGH); // Turn on relay 1.
                 
@@ -46,9 +54,16 @@
                         Serial.println(F("Unlocked."));
                     #endif
                 } else {
-                    // Flash red, blue and green plus beep a 3 times.
-                    feedback.output(SHORT_PERIOD, 1, RGBred);
-                    feedback.output(SHORT_PERIOD, 2, RGBblue);
+                    #if defined(using_Buzzer) && defined(using_LED)
+                        // Flash red, blue and green plus beep a 3 times.
+                        feedback.output(SHORT_PERIOD, 1, RGBred);
+                        feedback.output(SHORT_PERIOD, 2, RGBblue);
+                    #endif
+
+                    #if defined(using_Buzzer) && !defined(using_LED)
+                        // Beep three times
+                        feedback.output(SHORT_PERIOD, 3);
+                    #endif
 
                     #ifdef debug
                         Serial.println(F("-------------------"));
@@ -58,9 +73,16 @@
 
             break;
             case Unlocked:
-                // Flash green, blue and blue plus beep a 3 times.
-                feedback.output(SHORT_PERIOD, 1, RGBgreen);
-                feedback.output(SHORT_PERIOD, 2, RGBblue);
+                #if defined(using_Buzzer) && defined(using_LED)
+                    // Flash green, blue and blue plus beep a 3 times.
+                    feedback.output(SHORT_PERIOD, 1, RGBgreen);
+                    feedback.output(SHORT_PERIOD, 2, RGBblue);
+                #endif
+
+                #if defined(using_Buzzer) && !defined(using_LED)
+                        // Beep twice times
+                        feedback.output(SHORT_PERIOD, 2);
+                #endif
                 
                 digitalWrite(relay2, HIGH); // Turn on relay 2.
 
@@ -78,9 +100,16 @@
                         Serial.println(F("Locked."));
                     #endif
                 } else {
-                    // Flash blue, red and red plus beep a 3 times.
-                    feedback.output(SHORT_PERIOD, 1, RGBblue);
-                    feedback.output(SHORT_PERIOD, 2, RGBred);
+                    #if defined(using_Buzzer) && defined(using_LED)
+                        // Flash blue, red and red plus beep a 3 times.
+                        feedback.output(SHORT_PERIOD, 1, RGBblue);
+                        feedback.output(SHORT_PERIOD, 2, RGBred);
+                    #endif
+
+                    #if defined(using_Buzzer) && !defined(using_LED)
+                        // Beep three times
+                        feedback.output(SHORT_PERIOD, 3);
+                    #endif
 
                     #ifdef debug
                         Serial.println(F("-------------------"));
@@ -109,8 +138,15 @@
             Serial.println(F("Access authorised."));
         #endif
 
-        // Flash green led and beep a 3 times.
-        feedback.output(SHORT_PERIOD, 3, RGBgreen);
+        #if defined(using_Buzzer) && defined(using_LED)
+            // Flash green led and beep a 3 times.
+            feedback.output(SHORT_PERIOD, 3, RGBgreen);
+        #endif
+
+        #if defined(using_Buzzer) && !defined(using_LED)
+            // Beep Once times
+            feedback.output(SHORT_PERIOD, 1);
+        #endif
 
         // Play the track assigned when a authorised card / implant is scanned.
         #ifdef using_MP3
@@ -159,8 +195,15 @@
             Serial.println(F("Authorised."));
         #endif
 
-        // Flash green led and beep a 3 times.
-        feedback.output(SHORT_PERIOD, 3, RGBgreen);
+        #if defined(using_Buzzer) && defined(using_LED)
+            // Flash green led and beep a 3 times.
+            feedback.output(SHORT_PERIOD, 3, RGBgreen);
+        #endif
+
+        #if defined(using_Buzzer) && !defined(using_LED)
+            // Beep Once times
+            feedback.output(SHORT_PERIOD, 1);
+        #endif
 
         // Play the track assigned when a authorised card / implant is scanned.
         #ifdef using_MP3
